@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DailyTransfersChart } from '../Charts';
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, ShieldCheck } from 'lucide-react';
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronRight, CircleHelp, Copy, ShieldCheck } from 'lucide-react';
 import { dailyForNode, transactionsForNode } from '../data';
 import { roles, type DailyRow, type GraphData, type NodeRow } from '../types';
 import { priorityComponentsForNode, priorityFactors } from '../priority';
@@ -42,20 +42,19 @@ const scoreFormat = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 3, m
 
 function PriorityBreakdown({ node }: { node: NodeRow }) {
   const components = priorityComponentsForNode(node);
-  if (!components) return <p className="priority-unavailable">Для этой выгрузки нельзя восстановить точные вклады. Обновите результаты анализа.</p>;
-  const entries = Object.entries(components);
+  const entries = Object.entries(components ?? {});
   const total = entries.reduce((sum, [, value]) => sum + value, 0);
-  return <section className="priority-breakdown" aria-label="Состав приоритета">
-    <h4>Из чего складывается приоритет</h4>
-    <dl>{entries.map(([key, value]) => {
+  return <details className="priority-breakdown">
+    <summary><span>Из чего складывается приоритет</span><ChevronDown size={15} aria-hidden="true" /></summary>
+    {components ? <><dl>{entries.map(([key, value]) => {
       const factor = priorityFactors.find(item => item.key === key);
       const detail = node.in_deg + node.out_deg === 0 ? 'Нет внешних связей'
         : key === 'temporal' && node.is_seed ? 'Для исходного клиента не учитывается'
         : factor ? `${factor.basis} × ${factor.weight.toFixed(2).replace('.', ',')}` : 'Взвешенный вклад';
       return <div key={key}><dt><span>{factor?.label ?? key}</span><small>{detail}</small></dt><dd>{scoreFormat.format(value)}</dd></div>;
     })}<div className="priority-total"><dt>Сумма вкладов</dt><dd>{scoreFormat.format(total)}</dd></div></dl>
-    <p>Сумма равна приоритету с учётом округления.</p>
-  </section>;
+    <p>Сумма равна приоритету с учётом округления.</p></> : <p className="priority-unavailable">Для этой выгрузки нельзя восстановить точные вклады. Обновите результаты анализа.</p>}
+  </details>;
 }
 
 function RoleHypotheses({ node }: { node: NodeRow }) {
@@ -101,7 +100,7 @@ function ClientDetails({ node, data }: { node: NodeRow; data: GraphData }) {
       <div><span>Приоритет исследования</span><strong>{node.priority_score.toFixed(3)}<small> / 1</small></strong></div>
       <div className="score-track"><span style={{ width: percent(node.priority_score) }} /></div>
       <p>Относительный приоритет, не вероятность нарушения</p>
-      <PriorityBreakdown node={node} />
+      <PriorityBreakdown key={node.gid} node={node} />
     </div>
     <div className="money-pair">
       <div><span><ArrowDownLeft size={14} /> Входящие</span><strong title={money(node.in_kzt)}>{shortMoney(node.in_kzt)}</strong><small>Отправителей: {node.in_deg} · переводов: {node.in_tx}</small></div>
