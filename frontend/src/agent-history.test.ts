@@ -24,7 +24,7 @@ function chat(id = 'chat-a', updatedAt = 2000): AgentChat {
       activity: { startedAt: 1000, elapsedMs: 1000, phase: 'validating', reasoning: 'Проверены данные.', tools: [{ id: 'tool-1', name: 'get_node', state: 'completed' }] },
       response: {
         analysis_id: 'analysis-a', conversation_id: id,
-        answer: { summary: 'Ответ агента', findings: [{ text: 'Факт', evidence_ids: ['evidence-1'] }], hypotheses: [], limitations: ['Ограниченная выборка'] },
+        answer: { kind: 'investigation', summary: 'Ответ агента', findings: [{ text: 'Факт', evidence_ids: ['evidence-1'] }], hypotheses: [], limitations: ['Ограниченная выборка'] },
         evidence: [{ id: 'evidence-1', title: 'Клиент', facts: [{ label: 'Роль', value: 'Транзит' }], node_ids: [gid], paths: [], cluster_id: null, date_from: null, date_to: null, source: { tool: 'get_node', gid, direction: null } }],
       },
     }],
@@ -32,6 +32,23 @@ function chat(id = 'chat-a', updatedAt = 2000): AgentChat {
 }
 
 describe('saved agent chats', () => {
+  it('restores legacy investigations and keeps clarifications distinct after reload', () => {
+    const saved = storage();
+    const legacy = chat();
+    const { kind: _kind, ...answer } = legacy.turns[0].response.answer;
+    saved.setItem(`${AGENT_CHAT_PREFIX}${legacy.id}`, JSON.stringify({ ...legacy, turns: [{ ...legacy.turns[0], response: { ...legacy.turns[0].response, answer } }] }));
+    const clarification = chat('clarification-chat', 3000);
+    clarification.turns[0].question = 'папвап';
+    clarification.turns[0].response.answer = { kind: 'clarification', summary: 'Что вы хотите узнать о выбранном клиенте?', findings: [], hypotheses: [], limitations: [] };
+    clarification.turns[0].response.evidence = [];
+    clarification.turns[0].activity = { startedAt: 1000, elapsedMs: 1000, phase: 'validating', reasoning: '', tools: [] };
+    saveAgentChat(saved, clarification, data);
+    const restored = readAgentChats(saved, data);
+    expect(restored.chats).toEqual([clarification, legacy]);
+    expect(restored.unreadable).toBe(0);
+    expect(chatContinuationNotice(restored.chats[0], 4000)).toBeNull();
+  });
+
   it('restores separate conversations, exact evidence and the selected chat after storage reload', () => {
     const saved = storage();
     const first = chat();

@@ -203,6 +203,7 @@ def test_partial_answer_handles_split_escaped_unicode_quotes_and_newlines():
         assert all(finding.startswith(value) for value in preview["findings"])
     assert answer_preview(serialized) == {
         "type": "answer_preview",
+        "kind": "investigation",
         "summary": summary,
         "findings": [finding],
     }
@@ -210,4 +211,9 @@ def test_partial_answer_handles_split_escaped_unicode_quotes_and_newlines():
 
 @pytest.mark.parametrize("content", ["[]", "null", "42", '{"summary":123,"hypotheses":4}'])
 def test_invalid_partial_types_never_leak_as_preview(content):
-    assert answer_preview(content) == {"type": "answer_preview", "summary": "", "findings": []}
+    assert answer_preview(content) == {
+        "type": "answer_preview",
+        "kind": "investigation",
+        "summary": "",
+        "findings": [],
+    }

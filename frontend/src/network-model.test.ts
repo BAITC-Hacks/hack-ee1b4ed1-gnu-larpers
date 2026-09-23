@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientGraph, graphNeighborhood, groupGraph, layoutElements, type GraphModel } from './network-model';
+import { clientGraph, graphNeighborhood, groupGraph } from './network-model';
 import type { EdgeRow, GraphData, NodeRow } from './types';
 
 function node(gid: string, clusterId = 0): NodeRow {
@@ -99,7 +99,7 @@ describe('network models', () => {
     expect(graphNeighborhood(model, 'missing')).toEqual(new Set());
   });
 
-  it('creates deterministic, separated initial positions without mutating source data', () => {
+  it('preserves source data and boundary metadata when creating network views', () => {
     const nodes = [node('c'), node('a'), node('b')];
     nodes[0].in_deg = 10;
     nodes[0].is_seed = true;
@@ -108,15 +108,10 @@ describe('network models', () => {
     const original = structuredClone(data);
     const model = clientGraph(data.nodes, data.edges);
     const originalModel = structuredClone(model);
-    const first = layoutElements(model);
-    const reversed: GraphModel = { nodes: [...model.nodes].reverse(), edges: model.edges };
 
     groupGraph(data);
     graphNeighborhood(model, 'node:a');
-    expect(first).toEqual(layoutElements(reversed));
-    expect(new Set(first.filter(item => item.position).map(item => JSON.stringify(item.position))).size).toBe(3);
-    expect(first.find(item => item.data.id === 'node:c')?.data).toMatchObject({ seed: true, boundary: true, kind: 'client' });
-    expect(first.filter(item => item.data.source).every(item => Number.isFinite(item.data.width) && item.data.width > 0)).toBe(true);
+    expect(model.nodes.find(item => item.id === 'node:c')).toMatchObject({ seed: true, boundary: true, kind: 'client' });
     expect(model.nodes[0].size).toBeGreaterThan(model.nodes[1].size);
     expect(data).toEqual(original);
     expect(model).toEqual(originalModel);

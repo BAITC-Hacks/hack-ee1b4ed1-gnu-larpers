@@ -9,11 +9,13 @@ export default defineConfig({
     }),
     react(),
   ],
+  optimizeDeps: { include: ['three', 'three/addons/controls/OrbitControls.js'] },
   build: {
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('/node_modules/cytoscape/')) return 'graph';
+          if (id.includes('/node_modules/sigma/') || id.includes('/node_modules/@sigma/')) return 'graph-renderer';
+          if (id.includes('/node_modules/three/')) return 'graph-3d';
         },
       },
     },

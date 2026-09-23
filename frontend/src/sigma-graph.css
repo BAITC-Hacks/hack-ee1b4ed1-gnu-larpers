@@ -1,0 +1,24 @@
+.sigma-graph { position: relative; width: 100%; height: 100%; min-height: 420px; overflow: hidden; background: #17161d; }
+.sigma-surface { position: absolute; inset: 0; touch-action: none; }
+.sigma-loops { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sigma-controls { position: absolute; bottom: 16px; left: 16px; display: flex; align-items: center; gap: 2px; padding: 4px; z-index: 5; border: 1px solid #383440; border-radius: 9px; background: #211e29f5; }
+.sigma-controls button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 5px; color: #c8c1d4; background: transparent; cursor: pointer; }
+.sigma-controls button:hover { background: #3a3249; color: #f2eaff; }
+.sigma-controls button:disabled { opacity: .3; cursor: default; }
+.sigma-controls button:focus-visible { outline: 2px solid #c3a5f9; outline-offset: 1px; }
+.sigma-controls output { min-width: 43px; text-align: center; color: #a9a0b8; font-size: 10px; font-variant-numeric: tabular-nums; }
+.sigma-controls-divider { height: 17px; width: 1px; margin: 0 3px; background: #403947; }
+.sigma-tooltip { position: absolute; z-index: 4; top: 68px; left: 16px; display: flex; flex-direction: column; gap: 4px; max-width: calc(100% - 32px); border: 1px solid #494053; background: #25212ef5; border-radius: 8px; padding: 10px 12px; pointer-events: none; color: #eee7f8; font-size: 12px; }
+.sigma-tooltip strong { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sigma-tooltip span { color: #aba0b8; font-size: 10px; }
+.sigma-status { position: absolute; right: 16px; bottom: 28px; z-index: 3; color: #89818f; font-size: 10px; pointer-events: none; }
+.graph-explorer .sigma-status { left: 16px; right: auto; bottom: 66px; }
+.local-network-canvas > .sigma-graph { min-height: 250px; }
+.sigma-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 48px; color: #a59aaf; font-size: 13px; text-align: center; }
+.sigma-empty span { max-width: 380px; line-height: 1.6; }
+@media (max-width: 760px) {
+  .sigma-controls { left: 10px; bottom: 10px; }
+  .sigma-controls button { width: 30px; height: 34px; }
+  .sigma-status { display: none; }
+  .sigma-tooltip { top: 108px; left: 10px; max-width: calc(100% - 20px); }
+}

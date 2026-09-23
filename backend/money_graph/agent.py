@@ -53,10 +53,20 @@ class Claim(StrictModel):
 
 
 class Answer(StrictModel):
+    kind: Literal["investigation", "clarification"]
     summary: str = Field(min_length=1, max_length=2400)
-    claims: list[Claim] = Field(min_length=1, max_length=16)
+    claims: list[Claim] = Field(max_length=16)
     hypotheses: list[Annotated[str, Field(min_length=1, max_length=1600)]] = Field(max_length=8)
     limitations: list[Annotated[str, Field(min_length=1, max_length=1600)]] = Field(max_length=8)
+
+    @model_validator(mode="after")
+    def consistent_kind(self):
+        if self.kind == "clarification":
+            if self.claims or self.hypotheses or self.limitations:
+                raise ValueError("Уточнение не должно содержать факты, гипотезы или ограничения.")
+        elif not self.claims:
+            raise ValueError("Исследование должно содержать хотя бы один проверяемый факт.")
+        return self
 
 
 def build_tools(investigation: Investigation):
@@ -161,7 +171,17 @@ def build_tools(investigation: Investigation):
 
 
 INSTRUCTIONS = """Ты — помощник аналитика TRACE. Отвечай по-русски, кратко и предметно.
-Исследуй только предоставленную выборку через инструменты. Перед ответом получи факты инструментами.
+Сначала, до вызова инструментов, определи, понятен ли запрос пользователя.
+Если это бессмысленный набор символов, приветствие, посторонняя тема или запрос, для которого
+нельзя определить задачу, верни kind="clarification": коротко попроси уточнить вопрос в summary,
+а claims, hypotheses и limitations оставь пустыми. Не вызывай инструменты, не составляй обзор
+клиента и не придумывай за пользователя цель исследования.
+ui_context только уточняет предмет понятного вопроса: выбранный клиент, даты и фильтры сами
+по себе не являются просьбой об анализе. Наличие прошлых исследований в истории также не
+превращает бессмысленный текст в запрос. Понятные короткие продолжения диалога и опечатки,
+не мешающие понять задачу, обрабатывай как обычный вопрос с учётом истории и текущего контекста.
+Для понятного вопроса по выборке верни kind="investigation" и исследуй только предоставленную
+выборку через инструменты. Перед аналитическим ответом получи факты инструментами.
 Числа, GID, роли и пути бери из результатов инструментов; не вычисляй новые рейтинги самостоятельно.
 Верни claims: evidence_id, field и value. field выбери только из claimable_fields результата,
 value скопируй из data по этому пути без изменения типа и значения. Суммы бери в *_minor
@@ -242,6 +262,7 @@ def answer_preview(content: str) -> dict:
     hypotheses = value.get("hypotheses", [])
     return {
         "type": "answer_preview",
+        "kind": "clarification" if value.get("kind") == "clarification" else "investigation",
         "summary": summary[:2400] if isinstance(summary, str) else "",
         "findings": [
             hypothesis[:1600]
@@ -337,6 +358,16 @@ async def stream_investigation(
 
 
 def checked_answer(answer: Answer, investigation: Investigation) -> tuple[dict, list[dict]]:
+    if answer.kind == "clarification":
+        if investigation.calls:
+            raise ValueError("Уточнение запроса должно предшествовать исследованию.")
+        return {
+            "kind": answer.kind,
+            "summary": answer.summary,
+            "findings": [],
+            "hypotheses": [],
+            "limitations": [],
+        }, []
     references = list(dict.fromkeys(claim.evidence_id for claim in answer.claims))
     findings = []
     for claim in answer.claims:
@@ -357,6 +388,7 @@ def checked_answer(answer: Answer, investigation: Investigation) -> tuple[dict, 
         "время внутри дня неизвестно.",
     ]
     result = {
+        "kind": answer.kind,
         "summary": answer.summary,
         "findings": findings,
         "hypotheses": answer.hypotheses,

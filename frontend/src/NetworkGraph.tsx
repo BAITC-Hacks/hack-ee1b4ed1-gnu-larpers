@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
-import cytoscape, { type Core, type ElementDefinition, type Position } from 'cytoscape';
-import { Expand, Minus, Plus } from 'lucide-react';
-import { roles, type EdgeRow, type NodeRow } from './types';
-import { edgeId } from './agent';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowUpRight, LocateFixed, X } from 'lucide-react';
+import type { EdgeRow, NodeRow } from './types';
+import { RoleBadge, number, plural, shortMoney } from './format';
+import { clientGraph, graphNeighborhood } from './network-model';
+import GraphView from './GraphView';
+import './network-graph.css';
 
 interface NetworkGraphProps {
   nodes: NodeRow[];
@@ -13,244 +15,51 @@ interface NetworkGraphProps {
   onSelect: (gid: string) => void;
 }
 
-const shortId = (gid: string) => gid.length > 11 ? `…${gid.slice(-8)}` : gid;
-const importance = (node: NodeRow) => node.in_deg + node.out_deg + node.priority_score / 10;
-
-function overviewPositions(nodes: NodeRow[]): Map<string, Position> {
-  const clusters = new Map<number, NodeRow[]>();
-  for (const node of nodes) {
-    const group = clusters.get(node.cluster_id) ?? [];
-    group.push(node);
-    clusters.set(node.cluster_id, group);
-  }
-  const groups = [...clusters.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([, group]) => ({
-      group: group.sort((a, b) => importance(b) - importance(a) || a.gid.localeCompare(b.gid)),
-      radius: Math.max(42, Math.sqrt(group.length) * 16),
-    }));
-  const targetWidth = Math.sqrt(groups.reduce((area, group) => area + (group.radius * 2 + 64) ** 2, 0)) * 1.25;
-  const positions = new Map<string, Position>();
-  let x = 0;
-  let y = 0;
-  let rowHeight = 0;
-  for (const { group, radius } of groups) {
-    const size = radius * 2 + 64;
-    if (x > 0 && x + size > targetWidth) {
-      x = 0;
-      y += rowHeight;
-      rowHeight = 0;
-    }
-    group.forEach((node, index) => {
-      const distance = index === 0 ? 0 : radius * Math.sqrt(index / Math.max(1, group.length - 1));
-      const angle = index * Math.PI * (3 - Math.sqrt(5));
-      positions.set(node.gid, {
-        x: x + size / 2 + Math.cos(angle) * distance,
-        y: y + size / 2 + Math.sin(angle) * distance,
-      });
-    });
-    x += size;
-    rowHeight = Math.max(rowHeight, size);
-  }
-  return positions;
-}
-
-function focusPositions(nodes: NodeRow[], edges: EdgeRow[], selectedGid: string): Map<string, Position> {
-  if (nodes.length === 0) return new Map();
-  const center = nodes.find((node) => node.gid === selectedGid) ?? [...nodes].sort((a, b) => importance(b) - importance(a))[0];
-  const adjacency = new Map(nodes.map((node) => [node.gid, new Set<string>()]));
-  for (const edge of edges) {
-    adjacency.get(edge.src)?.add(edge.dst);
-    adjacency.get(edge.dst)?.add(edge.src);
-  }
-  const distances = new Map([[center.gid, 0]]);
-  const queue = [center.gid];
-  for (let index = 0; index < queue.length; index += 1) {
-    const gid = queue[index];
-    for (const neighbor of adjacency.get(gid) ?? []) {
-      if (!distances.has(neighbor) && adjacency.has(neighbor)) {
-        distances.set(neighbor, (distances.get(gid) ?? 0) + 1);
-        queue.push(neighbor);
-      }
-    }
-  }
-  const levels = new Map<number, NodeRow[]>();
-  for (const node of nodes) {
-    if (node.gid === center.gid) continue;
-    const level = distances.get(node.gid) ?? 3;
-    const group = levels.get(level) ?? [];
-    group.push(node);
-    levels.set(level, group);
-  }
-  const positions = new Map<string, Position>([[center.gid, { x: 0, y: 0 }]]);
-  let previousRadius = 0;
-  for (const [level, group] of [...levels.entries()].sort(([a], [b]) => a - b)) {
-    group.sort((a, b) => a.cluster_id - b.cluster_id || importance(b) - importance(a) || a.gid.localeCompare(b.gid));
-    const radius = Math.max(previousRadius + 115, group.length * 29 / (Math.PI * 2));
-    group.forEach((node, index) => {
-      const angle = index / group.length * Math.PI * 2 - Math.PI / 2 + level * 0.13;
-      positions.set(node.gid, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
-    });
-    previousRadius = radius;
-  }
-  return positions;
-}
-
 export default function NetworkGraph({ nodes, edges, selectedGid, mode, clusterId, onSelect }: NetworkGraphProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const graphRef = useRef<Core | null>(null);
-  const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
+  const model = useMemo(() => clientGraph(nodes, edges), [nodes, edges]);
+  const nodeById = useMemo(() => new Map(nodes.map(node => [`node:${node.gid}`, node])), [nodes]);
+  const [selectedId, setSelectedId] = useState(() => `node:${selectedGid}`);
+  const [neighborsOnly, setNeighborsOnly] = useState(false);
+  const [labels, setLabels] = useState(true);
+  const [focusRequest, setFocusRequest] = useState(0);
+  const selected = nodeById.get(selectedId);
+  const neighborhood = useMemo(() => graphNeighborhood(model, selectedId), [model, selectedId]);
+  const selectedEdges = useMemo(() => model.edges.filter(edge => edge.source === selectedId || edge.target === selectedId), [model, selectedId]);
+  const incoming = selectedEdges.filter(edge => edge.target === selectedId).reduce((sum, edge) => sum + edge.sumMinor, 0);
+  const outgoing = selectedEdges.filter(edge => edge.source === selectedId).reduce((sum, edge) => sum + edge.sumMinor, 0);
+  const external = mode === 'cluster' && selected && selected.cluster_id !== clusterId;
+  const shownNodes = selected && neighborsOnly ? neighborhood.size : model.nodes.length;
+  const shownEdges = selected && neighborsOnly ? selectedEdges.length : model.edges.length;
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    const graph = cytoscape({
-      container: containerRef.current,
-      elements: [],
-      minZoom: 0.07,
-      maxZoom: 4,
-      wheelSensitivity: 0.22,
-      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-      hideEdgesOnViewport: true,
-      boxSelectionEnabled: false,
-      autoungrabify: true,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': 'data(color)',
-            width: 'data(size)',
-            height: 'data(size)',
-            label: 'data(label)',
-            color: '#e9e2f5',
-            'font-family': 'Inter, sans-serif',
-            'font-size': 10,
-            'text-valign': 'bottom',
-            'text-margin-y': 7,
-            'text-background-color': '#14131f',
-            'text-background-opacity': 0.86,
-            'text-background-padding': '3px',
-            'border-width': 1.5,
-            'border-color': '#14131f',
-            'overlay-opacity': 0,
-          },
-        },
-        {
-          selector: 'node.seed',
-          style: { 'border-color': '#f0d8a6', 'border-width': 2.5 },
-        },
-        {
-          selector: 'node.boundary',
-          style: { 'border-style': 'dashed', 'border-color': '#aaa0ba', 'border-width': 2 },
-        },
-        {
-          selector: 'node.external',
-          style: { 'border-style': 'dotted', 'border-color': '#b8acc9', 'border-width': 3, opacity: 0.6 },
-        },
-        {
-          selector: 'edge',
-          style: {
-            width: 'data(width)',
-            'line-color': '#5c4d78',
-            'target-arrow-color': '#5c4d78',
-            'target-arrow-shape': 'triangle',
-            'arrow-scale': 0.7,
-            'curve-style': 'bezier',
-            opacity: 0.48,
-            'overlay-opacity': 0,
-          },
-        },
-        {
-          selector: 'edge.connected',
-          style: { 'line-color': '#bd99ff', 'target-arrow-color': '#bd99ff', opacity: 0.87, 'z-index': 5 },
-        },
-        {
-          selector: 'edge.evidence',
-          style: { 'line-color': '#e7cb81', 'target-arrow-color': '#e7cb81', opacity: 1, 'z-index': 6, width: 3 },
-        },
-        {
-          selector: 'node.chosen',
-          style: {
-            label: 'data(shortId)',
-            'border-width': 4,
-            'border-color': '#e8d5ff',
-            'border-style': 'solid',
-            'font-size': 12,
-            'font-weight': 700,
-            'text-margin-y': 9,
-            'z-index': 10,
-            'underlay-color': '#b388f4',
-            'underlay-opacity': 0.13,
-            'underlay-padding': 10,
-          },
-        },
-      ],
-    });
-    graphRef.current = graph;
-    graph.on('tap', 'node', (event) => onSelectRef.current(String(event.target.data('gid'))));
-    const observer = new ResizeObserver(() => graph.resize());
-    observer.observe(containerRef.current);
-    return () => {
-      observer.disconnect();
-      graph.destroy();
-      graphRef.current = null;
-    };
-  }, []);
+    setSelectedId(`node:${selectedGid}`);
+    setNeighborsOnly(false);
+  }, [selectedGid]);
 
   useEffect(() => {
-    const graph = graphRef.current;
-    if (!graph) return;
-    const positions = mode === 'overview' || mode === 'cluster' ? overviewPositions(nodes) : focusPositions(nodes, edges, selectedGid);
-    const ids = new Set(nodes.map((node) => node.gid));
-    const elements: ElementDefinition[] = nodes.map((node) => ({
-      data: {
-        id: `node:${node.gid}`,
-        gid: node.gid,
-        color: roles[node.role].color,
-        shortId: shortId(node.gid),
-        label: mode !== 'overview' && nodes.length < 35 ? shortId(node.gid) : '',
-        size: Math.min(35, 10 + Math.log2(1 + node.in_deg + node.out_deg) * 3 + node.priority_score * 0.035),
-      },
-      position: positions.get(node.gid),
-      classes: [node.is_seed ? 'seed' : '', node.truncated_by_depth ? 'boundary' : '', mode === 'cluster' && node.cluster_id !== clusterId ? 'external' : '', node.gid === selectedGid ? 'chosen' : ''].filter(Boolean).join(' '),
-    }));
-    edges.forEach(edge => {
-      if (!ids.has(edge.src) || !ids.has(edge.dst)) return;
-      elements.push({
-        data: {
-          id: `edge:${edgeId(edge.src, edge.dst)}`,
-          source: `node:${edge.src}`,
-          target: `node:${edge.dst}`,
-          width: Math.min(3, 0.55 + Math.log10(1 + Math.max(0, edge.sum_kzt)) * 0.2),
-        },
-        classes: mode === 'paths' ? 'evidence' : edge.src === selectedGid || edge.dst === selectedGid ? 'connected' : '',
-      });
-    });
-    graph.batch(() => {
-      graph.elements().remove();
-      graph.add(elements);
-    });
-    graph.layout({ name: 'preset', fit: true, padding: mode === 'overview' ? 35 : 55, animate: false }).run();
-  }, [nodes, edges, selectedGid, mode, clusterId]);
+    setSelectedId(current => nodeById.has(current) ? current : nodeById.has(`node:${selectedGid}`) ? `node:${selectedGid}` : '');
+  }, [nodeById, selectedGid]);
 
-  const zoom = (factor: number) => {
-    const graph = graphRef.current;
-    if (graph) graph.zoom({ level: Math.min(graph.maxZoom(), Math.max(graph.minZoom(), graph.zoom() * factor)), renderedPosition: { x: graph.width() / 2, y: graph.height() / 2 } });
+  const selectOnMap = (id: string) => {
+    setSelectedId(id);
+    if (!id) setNeighborsOnly(false);
   };
 
-  return (
-    <div className="network-graph" style={{ position: 'relative', width: '100%', height: '100%', minHeight: 420 }}>
-      <div ref={containerRef} role="img" aria-label={`Граф переводов: ${nodes.length} клиентов, ${edges.length} связей. Выберите клиента в списке или нажмите на узел.`} style={{ position: 'absolute', inset: 0 }} />
-      {nodes.length === 0 && <div className="graph-empty">По этим фильтрам клиентов не найдено</div>}
-      <div className="graph-controls">
-        <button className="graph-control" type="button" aria-label="Увеличить граф" title="Увеличить" onClick={() => zoom(1.3)}><Plus size={17} /></button>
-        <button className="graph-control" type="button" aria-label="Уменьшить граф" title="Уменьшить" onClick={() => zoom(1 / 1.3)}><Minus size={17} /></button>
-        <button className="graph-control" type="button" aria-label="Показать весь граф" title="Показать весь граф" onClick={() => graphRef.current?.fit(undefined, 40)}><Expand size={16} /></button>
-      </div>
-      <div className="graph-hint">
-        <span>● → ● направление перевода</span>
-        <span>Нажмите на узел, чтобы изучить связи</span>
-      </div>
+  if (!nodes.length) return <div className="network-graph interactive-network network-empty-state"><strong>В этой выборке нет клиентов</strong><p>Измените группу, глубину окружения или выбранные пути.</p></div>;
+
+  return <div className="network-graph interactive-network" data-graph-mode={mode} data-selected-gid={selected?.gid ?? ''}>
+    <div className="local-network-toolbar">
+      <label className="local-network-picker">Выделить клиента<select aria-label="Выделить клиента на карте" value={selected?.gid ?? ''} onChange={event => { selectOnMap(event.target.value ? `node:${event.target.value}` : ''); setFocusRequest(value => value + 1); }}><option value="">Выберите ID</option>{nodes.map(node => <option key={node.gid} value={node.gid}>{node.gid} · гр. {node.cluster_id + 1}{mode === 'cluster' && node.cluster_id !== clusterId ? ' · внешний' : ''}</option>)}</select></label>
+      <div className="local-network-options"><label><input type="checkbox" checked={labels} onChange={event => setLabels(event.target.checked)} />Подписи</label><label><input type="checkbox" checked={neighborsOnly} disabled={!selected} onChange={event => setNeighborsOnly(event.target.checked)} />Только прямые связи</label></div>
+      <span className="local-network-count">{number.format(shownNodes)} {plural(shownNodes, 'клиент', 'клиента', 'клиентов')} · {number.format(shownEdges)} {plural(shownEdges, 'связь', 'связи', 'связей')}</span>
     </div>
-  );
+    <div className="local-network-canvas"><GraphView model={model} selectedId={selected?.gid ? selectedId : ''} neighborsOnly={neighborsOnly} focusRequest={focusRequest} onSelect={selectOnMap} colorMode="roles" labels={labels} evidence={mode === 'paths'} /></div>
+    <div className="local-network-selection" aria-live="polite">
+      {selected ? <>
+        <div className="local-network-client"><strong>{selected.gid}</strong><span><RoleBadge role={selected.role} /><span>{external ? 'Внешний контрагент · ' : ''}Группа {selected.cluster_id + 1}</span></span></div>
+        <div className="local-network-flows"><span>Входящие <strong>{shortMoney(incoming / 100)}</strong></span><span>Исходящие <strong>{shortMoney(outgoing / 100)}</strong></span><small>По связям текущей карты</small></div>
+        <div className="local-network-actions"><button type="button" className="local-network-locate" aria-label="Приблизить выделенного клиента" onClick={() => setFocusRequest(value => value + 1)}><LocateFixed size={16} /></button><button type="button" className="local-network-open" onClick={() => onSelect(selected.gid)}>Открыть клиента<ArrowUpRight size={15} /></button><button type="button" aria-label="Снять выделение клиента" onClick={() => selectOnMap('')}><X size={16} /></button></div>
+      </> : <p>Нажмите на узел или выберите ID, чтобы выделить клиента и его связи. Карта останется на месте.</p>}
+    </div>
+  </div>;
 }

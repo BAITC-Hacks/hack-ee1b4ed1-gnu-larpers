@@ -20,11 +20,13 @@ export interface EvidenceCard {
 }
 
 export type AgentEvidence = EvidenceCard;
+export type AgentAnswerKind = 'investigation' | 'clarification';
 
 export interface AgentResponse {
   analysis_id: string;
   conversation_id: string;
   answer: {
+    kind: AgentAnswerKind;
     summary: string;
     findings: { text: string; evidence_ids: string[] }[];
     hypotheses?: string[];
@@ -37,7 +39,7 @@ export type AgentStreamUpdate =
   | { type: 'status'; phase: 'thinking' | 'answer' | 'validating' }
   | { type: 'status'; phase: 'tool'; tool: string; call_id: string; state: 'started' | 'completed' }
   | { type: 'reasoning_delta'; delta: string }
-  | { type: 'answer_preview'; summary: string; findings: string[] };
+  | { type: 'answer_preview'; kind: AgentAnswerKind; summary: string; findings: string[] };
 
 export type EvidenceAction =
   | { type: 'node'; gid: string }
@@ -68,6 +70,12 @@ function text(value: unknown): string {
 
 function nullableText(value: unknown): string | null {
   return value === null ? null : text(value);
+}
+
+function answerKind(value: unknown): AgentAnswerKind {
+  if (value === undefined) return 'investigation';
+  if (value !== 'investigation' && value !== 'clarification') throw new Error('Агент вернул неизвестный тип ответа.');
+  return value;
 }
 
 function date(value: unknown): string | null {
@@ -150,15 +158,21 @@ export function parseAgentResponse(value: unknown, data: GraphData, conversation
     return card;
   });
   const answer = object(row.answer);
+  const kind = answerKind(answer.kind);
   const findings = array(answer.findings).map(value => {
     const finding = object(value);
     const ids = array(finding.evidence_ids).map(text);
     if (!ids.length || ids.some(id => !evidenceIds.has(id))) throw new Error('Вывод агента не содержит подтверждённой ссылки на доказательство.');
     return { text: text(finding.text), evidence_ids: ids };
   });
+  const hypotheses = answer.hypotheses === undefined ? [] : array(answer.hypotheses).map(text);
+  const limitations = array(answer.limitations).map(text);
+  if (kind === 'clarification' && (findings.length || hypotheses.length || limitations.length || evidence.length)) {
+    throw new Error('Уточнение агента содержит неожиданные результаты исследования.');
+  }
   return {
     analysis_id: analysisId, conversation_id: returnedConversation,
-    answer: { summary: text(answer.summary), findings, hypotheses: answer.hypotheses === undefined ? [] : array(answer.hypotheses).map(text), limitations: array(answer.limitations).map(text) }, evidence,
+    answer: { kind, summary: text(answer.summary), findings, hypotheses, limitations }, evidence,
   };
 }
 
@@ -235,10 +249,12 @@ export async function readAgentStream(
       if (reasoningSize > 24000) throw new Error('Агент превысил допустимый размер объяснения.');
       onUpdate({ type: 'reasoning_delta', delta });
     } else if (row.type === 'answer_preview') {
+      const kind = answerKind(row.kind);
       const summary = boundedText(row.summary, 2400);
       const findings = array(row.findings);
       if (findings.length > 8) throw new Error('Агент прислал слишком много выводов.');
-      onUpdate({ type: 'answer_preview', summary, findings: findings.map(value => boundedText(value, 1600)) });
+      if (kind === 'clarification' && findings.length) throw new Error('Уточнение агента содержит неожиданные результаты исследования.');
+      onUpdate({ type: 'answer_preview', kind, summary, findings: findings.map(value => boundedText(value, 1600)) });
     } else if (row.type === 'status') {
       if (row.phase === 'thinking' || row.phase === 'answer' || row.phase === 'validating') {
         onUpdate({ type: 'status', phase: row.phase });

@@ -1,4 +1,3 @@
-import type { ElementDefinition } from 'cytoscape';
 import { roles, type EdgeRow, type GraphData, type NodeRow } from './types';
 
 export interface GraphNode {
@@ -92,19 +91,4 @@ export function graphNeighborhood(model: GraphModel, selectedId: string): Set<st
     if (edge.target === selectedId && ids.has(edge.source)) neighbors.add(edge.source);
   }
   return neighbors;
-}
-
-export function layoutElements(model: GraphModel): ElementDefinition[] {
-  const sortedNodes = [...model.nodes].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  const columns = Math.max(1, Math.ceil(Math.sqrt(sortedNodes.length)));
-  const elements: ElementDefinition[] = sortedNodes.map((node, index) => ({
-    data: { ...node },
-    position: { x: index % columns * 120, y: Math.floor(index / columns) * 120 },
-  }));
-  for (const edge of model.edges) {
-    elements.push({
-      data: { ...edge, width: Math.min(5, 0.7 + Math.log10(1 + Math.max(0, edge.sumMinor) / 100) * 0.35) },
-    });
-  }
-  return elements;
 }

@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Network } from 'lucide-react';
-import { roles, type EdgeRow, type GraphData, type NodeRow, type Role } from '../types';
+import { roles, type EdgeRow, type GraphData, type NodeRow } from '../types';
 import { RoleBadge, number, percent, plural, shortId, shortMoney } from '../format';
 import NetworkGraph from '../NetworkGraph';
 import GraphExplorer from '../GraphExplorer';
 import { evidenceGraph } from '../agent';
 import { selectClusterGraph, selectNeighborhood } from '../data';
 
-function FlowGraph({ data, node, onSelect, expandSide }: { data: GraphData; node: NodeRow; onSelect: (gid: string) => void; expandSide?: 'in' | 'out' | null }) {
+function FlowGraph({ data, node, onSelect }: { data: GraphData; node: NodeRow; onSelect: (gid: string) => void }) {
   const [expandedIn, setExpandedIn] = useState(false);
   const [expandedOut, setExpandedOut] = useState(false);
   useEffect(() => { setExpandedIn(false); setExpandedOut(false); }, [node.gid]);
-  useEffect(() => { if (expandSide === 'in') setExpandedIn(true); if (expandSide === 'out') setExpandedOut(true); }, [expandSide]);
   const flow = useMemo(() => {
     const incoming = data.edges.filter(edge => edge.dst === node.gid && edge.src !== node.gid).sort((a, b) => b.sum_minor - a.sum_minor);
     const outgoing = data.edges.filter(edge => edge.src === node.gid && edge.dst !== node.gid).sort((a, b) => b.sum_minor - a.sum_minor);
@@ -49,8 +48,6 @@ function FlowGraph({ data, node, onSelect, expandSide }: { data: GraphData; node
     <p className="flow-footnote">Эти связи не показывают, что конкретное поступление стало конкретным исходящим переводом.</p>
   </div>;
 }
-
-type MapParty = { gid?: string; label: string; role?: Role; amount: number; transfers: number; count?: number };
 
 type GroupRoute = { src: number; dst: number; sumMinor: number; links: number; transfers: number };
 
@@ -126,47 +123,6 @@ function NetworkOverview({ data, selectedGid, onSelectClient, onOpenCluster }: {
   </div>;
 }
 
-function RelationshipMap({ data, node, onSelect, onShowMore }: { data: GraphData; node: NodeRow; onSelect: (gid: string) => void; onShowMore: (side: 'in' | 'out') => void }) {
-  const { incoming, outgoing } = useMemo(() => {
-    const byId = new Map(data.nodes.map(item => [item.gid, item]));
-    const summarize = (edges: EdgeRow[], direction: 'in' | 'out'): MapParty[] => {
-      const sorted = edges.sort((a, b) => b.sum_minor - a.sum_minor);
-      const shown: MapParty[] = sorted.slice(0, 4).map(edge => {
-        const gid = direction === 'in' ? edge.src : edge.dst;
-        return { gid, label: shortId(gid), role: byId.get(gid)?.role, amount: edge.sum_kzt, transfers: edge.n_tx };
-      });
-      const rest = sorted.slice(4);
-      if (rest.length) shown.push({ label: `Другие ${rest.length}`, amount: rest.reduce((total, edge) => total + edge.sum_kzt, 0), transfers: rest.reduce((total, edge) => total + edge.n_tx, 0), count: rest.length });
-      return shown;
-    };
-    return {
-      incoming: summarize(data.edges.filter(edge => edge.dst === node.gid && edge.src !== node.gid), 'in'),
-      outgoing: summarize(data.edges.filter(edge => edge.src === node.gid && edge.dst !== node.gid), 'out'),
-    };
-  }, [data, node.gid]);
-  const position = (index: number, count: number) => 280 + (index - (count - 1) / 2) * 100;
-  const renderParties = (parties: MapParty[], side: 'in' | 'out') => parties.map((party, index) => {
-    const top = `${position(index, parties.length) / 560 * 100}%`;
-    return <button key={party.gid ?? `${side}-other`} className={`map-party ${side} ${party.count ? 'aggregate' : ''}`} style={{ top }} onClick={() => party.gid ? onSelect(party.gid) : onShowMore(side)} title={party.gid ?? 'Перейти к остальным связям в списке ниже'}>
-      <span className="map-party-heading"><strong>{party.label}</strong><span>{shortMoney(party.amount)}</span></span>
-      <span className="map-party-subtitle">{party.count ? `${party.count} ${plural(party.count, 'клиент', 'клиента', 'клиентов')}` : party.role ? roles[party.role].label : 'Клиент'} · {party.transfers} {plural(party.transfers, 'перевод', 'перевода', 'переводов')}</span>
-    </button>;
-  });
-  return <div className="relationship-map" aria-label="Схема прямых переводов выбранного клиента">
-    <div className="map-direction-label in"><span>Отправители</span><strong>{incoming.length > 0 ? `${node.in_deg} ${plural(node.in_deg, 'клиент', 'клиента', 'клиентов')}` : 'Нет связей'}</strong></div>
-    <div className="map-direction-label out"><span>Получатели</span><strong>{outgoing.length > 0 ? `${node.out_deg} ${plural(node.out_deg, 'клиент', 'клиента', 'клиентов')}` : 'Нет связей'}</strong></div>
-    <svg className="map-connections" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="map-in-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8b819c" /></marker><marker id="map-out-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#aa86df" /></marker></defs>
-      {incoming.map((party, index) => <path key={`in-${index}`} d={`M 250 ${position(index, incoming.length)} L 410 280`} className={party.count ? 'aggregate' : ''} markerEnd="url(#map-in-arrow)" />)}
-      {outgoing.map((party, index) => <path key={`out-${index}`} d={`M 590 280 L 750 ${position(index, outgoing.length)}`} className={party.count ? 'aggregate outgoing' : 'outgoing'} markerEnd="url(#map-out-arrow)" />)}
-    </svg>
-    {renderParties(incoming, 'in')}
-    <div className="map-focus"><span>Выбранный клиент</span><strong title={node.gid}>{shortId(node.gid)}</strong><RoleBadge role={node.role} /><small>Группа {node.cluster_id + 1}</small></div>
-    {renderParties(outgoing, 'out')}
-    {!incoming.length && <div className="map-empty in">Поступлений от других клиентов не видно</div>}
-    {!outgoing.length && <div className="map-empty out">Отправлений другим клиентам не видно</div>}
-  </div>;
-}
-
 function GraphClients({ nodes, selectedGid, clusterId, onSelect }: { nodes: NodeRow[]; selectedGid: string; clusterId?: number; onSelect: (gid: string) => void }) {
   const [query, setQuery] = useState('');
   const visible = nodes.filter(node => node.gid.includes(query.trim()));
@@ -177,8 +133,8 @@ function GraphClients({ nodes, selectedGid, clusterId, onSelect }: { nodes: Node
   </details>;
 }
 
-function GraphLegend({ external = false }: { external?: boolean }) {
-  return <div className="graph-legend" aria-label="Условные обозначения графа">{Object.entries(roles).map(([key, item]) => <span key={key}><i style={{ background: item.color }} />{item.label}</span>)}{external && <span><i className="external-marker" />Внешний контрагент</span>}</div>;
+function GraphLegend() {
+  return <div className="graph-legend" aria-label="Условные обозначения графа">{Object.entries(roles).map(([key, item]) => <span key={key}><i style={{ background: item.color }} />{item.label}</span>)}</div>;
 }
 
 function ClusterGraph({ data, clusterId, selectedGid, includeExternal, onIncludeExternalChange, onSelectClient, onBrowseGroup }: { data: GraphData; clusterId: number; selectedGid: string; includeExternal: boolean; onIncludeExternalChange: (value: boolean) => void; onSelectClient: (gid: string) => void; onBrowseGroup: (id: number) => void }) {
@@ -192,7 +148,7 @@ function ClusterGraph({ data, clusterId, selectedGid, includeExternal, onInclude
       <div className="graph-scope-controls"><label className="external-control"><input type="checkbox" checked={includeExternal} onChange={event => onIncludeExternalChange(event.target.checked)} />Внешние контрагенты <span>({number.format(graph.externalCount)})</span></label><span>{number.format(graph.externalEdgeCount)} {plural(graph.externalEdgeCount, 'связь', 'связи', 'связей')} с другими группами</span></div>
       <p className="graph-scope-count" aria-live="polite">На графе все {number.format(graph.memberCount)} {plural(graph.memberCount, 'клиент', 'клиента', 'клиентов')} группы{includeExternal ? ` и ${number.format(graph.externalCount)} внешних контрагентов` : ''} · {number.format(graph.edges.length)} {plural(graph.edges.length, 'направленная связь', 'направленные связи', 'направленных связей')}. Ограничения числа клиентов нет.</p>
       <div className="scope-network-stage"><NetworkGraph nodes={graph.nodes} edges={graph.edges} selectedGid={selectedGid} clusterId={clusterId} mode="cluster" onSelect={onSelectClient} /></div>
-      <GraphLegend external={includeExternal && graph.externalCount > 0} />
+      <GraphLegend />
       <GraphClients key={clusterId} nodes={graph.nodes} clusterId={clusterId} selectedGid={selectedGid} onSelect={onSelectClient} />
       <p className="visualization-note">Внешние контрагенты связаны напрямую хотя бы с одним участником группы. Связи внешних клиентов между собой не включены. Принадлежность к группе описывает структуру наблюдаемой сети и не устанавливает общий контроль над клиентами.</p>
     </section>
@@ -202,7 +158,7 @@ function ClusterGraph({ data, clusterId, selectedGid, includeExternal, onInclude
 function NeighborhoodGraph({ data, node, hops, onHopsChange, onSelectClient }: { data: GraphData; node: NodeRow; hops: 1 | 2; onHopsChange: (hops: 1 | 2) => void; onSelectClient: (gid: string) => void }) {
   const graph = useMemo(() => selectNeighborhood(data, node.gid, hops, 250), [data, node.gid, hops]);
   return <section className="visualization-panel scope-graph-panel neighborhood-panel" aria-label="Граф окружения клиента">
-    <div className="visualization-intro"><div><span className="eyebrow">Окружение клиента</span><h3>Связи на {hops === 1 ? 'один шаг' : 'два шага'}</h3><p>Окружение раскрывается по входящим и исходящим связям. Стрелки сохраняют направление наблюдаемых переводов.</p></div><div className="scope-control" role="group" aria-label="Глубина окружения">{([1, 2] as const).map(value => <button type="button" key={value} aria-pressed={hops === value} className={hops === value ? 'active' : ''} onClick={() => onHopsChange(value)}>{value} {value === 1 ? 'шаг' : 'шага'}</button>)}</div></div>
+    <div className="visualization-intro"><div><span className="eyebrow">Окружение клиента</span><h3>Связи на {hops === 1 ? 'один шаг' : 'два шага'}</h3><p>Перетаскивайте узлы, приближайте карту и выделяйте соседей. Нажатие сохраняет текущее окружение; отдельная кнопка открывает другого клиента.</p></div><div className="scope-control" role="group" aria-label="Глубина окружения">{([1, 2] as const).map(value => <button type="button" key={value} aria-pressed={hops === value} className={hops === value ? 'active' : ''} onClick={() => onHopsChange(value)}>{value} {value === 1 ? 'шаг' : 'шага'}</button>)}</div></div>
     <p className={`graph-scope-count ${graph.truncated ? 'truncated' : ''}`} aria-live="polite">Показано {number.format(graph.nodes.length)} из {number.format(graph.totalNodes)} {plural(graph.totalNodes, 'клиента', 'клиентов', 'клиентов')}, включая выбранного · {number.format(graph.edges.length)} {plural(graph.edges.length, 'связь', 'связи', 'связей')}.{graph.truncated ? ` Достигнут лимит 250 клиентов: скрыто ${number.format(graph.totalNodes - graph.nodes.length)}. Сначала включаются ближайшие клиенты, затем клиенты с более высоким приоритетом. Связи скрытых клиентов не отображаются.` : ' Все клиенты этого окружения включены.'}</p>
     <div className="scope-network-stage"><NetworkGraph nodes={graph.nodes} edges={graph.edges} selectedGid={node.gid} mode="focus" onSelect={onSelectClient} /></div>
     <GraphLegend />
@@ -231,26 +187,18 @@ interface VisualizationPageProps {
 }
 
 export default function VisualizationPage({ data, node, mode, clusterId, hops, includeExternal, onModeChange, onHopsChange, onIncludeExternalChange, onOpenCluster, onSelectClient, onBrowseClients, onBrowseGroup, onOpenProfile, evidencePaths, onClearPaths }: VisualizationPageProps) {
-  const [expandedSide, setExpandedSide] = useState<'in' | 'out' | null>(null);
   const pathGraph = useMemo(() => evidenceGraph(data, evidencePaths), [data, evidencePaths]);
-  useEffect(() => { setExpandedSide(null); }, [node.gid]);
   return <>
     <div className="visualization-switch" role="tablist" aria-label="Масштаб визуализации"><button role="tab" aria-selected={mode === 'overview'} className={mode === 'overview' ? 'active' : ''} onClick={() => onModeChange('overview')}>Вся сеть</button><button role="tab" aria-selected={mode === 'cluster'} className={mode === 'cluster' ? 'active' : ''} onClick={() => onOpenCluster(clusterId ?? node.cluster_id)}>Группа</button><button role="tab" aria-selected={mode === 'client'} className={mode === 'client' ? 'active' : ''} onClick={() => onModeChange('client')}>Один клиент</button></div>
     {mode !== 'overview' && <nav className="graph-breadcrumbs" aria-label="Путь исследования"><button onClick={() => onModeChange('overview')}>Вся сеть</button><span aria-hidden="true">/</span>{mode === 'cluster' ? <strong aria-current="page">Группа {(clusterId ?? node.cluster_id) + 1}</strong> : <><button onClick={() => onOpenCluster(clusterId ?? node.cluster_id)}>Группа {(clusterId ?? node.cluster_id) + 1}</button><span aria-hidden="true">/</span><strong aria-current="page">Клиент {shortId(node.gid)}</strong>{clusterId !== null && clusterId !== node.cluster_id && <button onClick={() => onOpenCluster(node.cluster_id)}>Его группа {node.cluster_id + 1}</button>}</>}</nav>}
     {evidencePaths.length > 0 ? <section className="visualization-panel" aria-label="Пути из ответа агента">
       <div className="visualization-intro"><div><span className="eyebrow">Основания ответа</span><h3>Наблюдаемые пути от исходных клиентов</h3><p>{evidencePaths.length} {plural(evidencePaths.length, 'путь', 'пути', 'путей')} · {pathGraph.nodes.length} {plural(pathGraph.nodes.length, 'клиент', 'клиента', 'клиентов')} · только связи из выбранного основания.</p></div><button className="method-link" onClick={onClearPaths}>Вернуться к связям клиента</button></div>
-      <NetworkGraph nodes={pathGraph.nodes} edges={pathGraph.edges} selectedGid={node.gid} mode="paths" onSelect={onSelectClient} />
+      <div className="scope-network-stage"><NetworkGraph nodes={pathGraph.nodes} edges={pathGraph.edges} selectedGid={node.gid} mode="paths" onSelect={onSelectClient} /></div>
       <p className="visualization-note">Направленные пути подтверждены графом. Они не доказывают движение одних и тех же денег или порядок переводов внутри дня.</p>
     </section> : mode === 'overview' ? <NetworkOverview data={data} selectedGid={node.gid} onSelectClient={onSelectClient} onOpenCluster={onOpenCluster} /> : mode === 'cluster' ? <ClusterGraph data={data} clusterId={clusterId ?? node.cluster_id} selectedGid={node.gid} includeExternal={includeExternal} onIncludeExternalChange={onIncludeExternalChange} onSelectClient={onSelectClient} onBrowseGroup={onBrowseGroup} /> : <>
       <div className="workspace-toolbar"><button className="directory-trigger" onClick={onBrowseClients}>Выбрать клиента</button><button className="method-link" onClick={onOpenProfile}>Профиль и переводы</button></div>
-      <section className="visualization-panel relationship-map-panel" aria-label="Граф прямых переводов">
-
-        <div className="visualization-intro"><div><span className="eyebrow">Прямые переводы</span><h3>Кто отправлял и кому ушли средства</h3><p>Показаны до четырёх крупнейших связей по сумме с каждой стороны. Остальные объединены в одну группу.</p></div><div className="visualization-key"><span><i />Поступления</span><span><i />Отправления</span></div></div>
-        <RelationshipMap data={data} node={node} onSelect={onSelectClient} onShowMore={side => { setExpandedSide(side); document.getElementById('relationship-list')?.scrollIntoView({ behavior: 'smooth' }); }} />
-        <p className="visualization-note">Стрелки показывают направление прямого перевода. Входящие и исходящие суммы не образуют баланс и не доказывают дальнейший путь конкретных денег.</p>
-      </section>
-      <section className="relationship-list-panel" id="relationship-list"><div className="relationship-list-heading"><div><h3>Прямые связи клиента</h3><p>Пять крупнейших контрагентов по сумме с каждой стороны. Остальных можно раскрыть. Выберите клиента, чтобы перестроить схему.</p></div><span>{node.in_deg + node.out_deg} {plural(node.in_deg + node.out_deg, 'связь', 'связи', 'связей')}</span></div><FlowGraph data={data} node={node} onSelect={onSelectClient} expandSide={expandedSide} /></section>
       <NeighborhoodGraph data={data} node={node} hops={hops} onHopsChange={onHopsChange} onSelectClient={onSelectClient} />
+      <section className="relationship-list-panel" id="relationship-list"><div className="relationship-list-heading"><div><h3>Прямые связи клиента</h3><p>Пять крупнейших контрагентов по сумме с каждой стороны. Остальных можно раскрыть. Выберите клиента, чтобы перестроить схему.</p></div><span>{node.in_deg + node.out_deg} {plural(node.in_deg + node.out_deg, 'связь', 'связи', 'связей')}</span></div><FlowGraph data={data} node={node} onSelect={onSelectClient} /></section>
     </>}
   </>;
 }

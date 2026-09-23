@@ -41,6 +41,7 @@ def body(store, **overrides):
 async def successful_runner(request, investigation, history, model, emit):
     result = investigation.execute("get_node", gid=request.selected_gid)
     return Answer(
+        kind="investigation",
         summary="Наблюдаемый конец цепочки.",
         claims=[Claim(evidence_id=result["evidence_id"], field="truncated_by_depth", value=True)],
         hypotheses=[],

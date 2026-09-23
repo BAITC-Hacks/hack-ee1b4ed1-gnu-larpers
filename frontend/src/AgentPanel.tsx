@@ -386,9 +386,10 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
 
         {turns.map(turn => <article className="trace-agent-turn" key={turn.id}>
           <div className="trace-agent-question"><span title={turn.selectedGid}>Вы · клиент …{turn.selectedGid.slice(-8)}</span><p>{turn.question}</p></div>
-          <ActivityDisclosure activity={turn.activity} now={now} />
-          <div className="trace-agent-answer-label"><Bot size={15} /><strong>TRACE</strong><span>Интерпретация модели</span></div>
+          {turn.response.answer.kind === 'investigation' && <ActivityDisclosure activity={turn.activity} now={now} />}
+          <div className="trace-agent-answer-label"><Bot size={15} /><strong>TRACE</strong>{turn.response.answer.kind === 'investigation' && <span>Интерпретация модели</span>}</div>
           <p className="trace-agent-summary">{turn.response.answer.summary}</p>
+          {turn.response.answer.kind === 'investigation' && <>
           <p className="trace-agent-preview-note">Интерпретация и гипотезы требуют проверки аналитиком.</p>
           {(turn.response.answer.hypotheses?.length ?? 0) > 0 && <div className="trace-agent-hypotheses"><h4>Гипотезы и рекомендации</h4><ul>{turn.response.answer.hypotheses!.map((hypothesis, index) => <li key={index}>{hypothesis}</li>)}</ul></div>}
           {turn.response.answer.findings.length > 0 && <h4 className="trace-agent-evidence-heading">Проверенные факты из выборки</h4>}
@@ -409,9 +410,21 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
           </article></Card>;
           })}</div>
           {turn.response.answer.limitations.length > 0 && <details className="trace-agent-limitations"><summary><Info size={14} /><span>Границы вывода</span><Badge color="gray" variant="soft" size="1">{turn.response.answer.limitations.length}</Badge><ChevronDown size={14} /></summary><ul>{turn.response.answer.limitations.map((limit, index) => <li key={index}>{limit}</li>)}</ul></details>}
+          </>}
         </article>)}
 
-        {pending && activity && <div className="trace-agent-pending-turn"><div className="trace-agent-question"><span title={selectedGid}>Вы · клиент …{selectedGid.slice(-8)}</span><p>{message}</p></div><ActivityDisclosure activity={activity} pending now={now} />{preview && (preview.summary || preview.findings.length > 0) && <div className="trace-agent-preview"><div className="trace-agent-answer-label"><Bot size={15} /><strong>TRACE</strong><Badge variant="soft" size="1">Формируется ответ</Badge></div><p className="trace-agent-summary">{preview.summary}</p>{preview.findings.length > 0 && <ul className="trace-agent-findings">{preview.findings.map((finding, index) => <li key={index}>{finding}</li>)}</ul>}<span className="trace-agent-preview-note">Предварительная интерпретация модели · факты ещё проверяются</span></div>}</div>}
+        {pending && activity && <div className="trace-agent-pending-turn">
+          <div className="trace-agent-question"><span title={selectedGid}>Вы · клиент …{selectedGid.slice(-8)}</span><p>{message}</p></div>
+          {preview?.kind !== 'clarification' && <ActivityDisclosure activity={activity} pending now={now} />}
+          {preview && (preview.summary || preview.findings.length > 0) && <div className="trace-agent-preview">
+            <div className="trace-agent-answer-label"><Bot size={15} /><strong>TRACE</strong>{preview.kind === 'investigation' && <Badge variant="soft" size="1">Формируется ответ</Badge>}</div>
+            <p className="trace-agent-summary">{preview.summary}</p>
+            {preview.kind === 'investigation' && <>
+              {preview.findings.length > 0 && <ul className="trace-agent-findings">{preview.findings.map((finding, index) => <li key={index}>{finding}</li>)}</ul>}
+              <span className="trace-agent-preview-note">Предварительная интерпретация модели · факты ещё проверяются</span>
+            </>}
+          </div>}
+        </div>}
       </div>
 
       <div className="trace-agent-composer">

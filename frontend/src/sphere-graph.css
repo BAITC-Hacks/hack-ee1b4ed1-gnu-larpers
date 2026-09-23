@@ -1,0 +1,5 @@
+.sphere-graph .sigma-surface canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+.sphere-graph .sigma-surface canvas:focus-visible { outline: 2px solid #b795eb; outline-offset: -3px; }
+.sphere-graph .sigma-status { bottom: 66px; left: 16px; right: auto; }
+.sphere-graph .sigma-tooltip { top: 112px; }
+.local-network-canvas .sphere-graph .sigma-tooltip { top: 58px; }
