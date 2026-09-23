@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CircleHelp, FileText, GitBranch, Layers3, PanelLeftClose, PanelLeftOpen, Search, Waypoints, X } from 'lucide-react';
+import { CircleHelp, FileText, GitBranch, Layers3, Menu, PanelLeftClose, PanelLeftOpen, Search, Waypoints, X } from 'lucide-react';
 import type { GraphData } from './types';
 
 type View = 'report' | 'visualization' | 'explore' | 'clusters' | 'method';
@@ -28,6 +28,8 @@ export default function SidebarNav({ view, onNavigate, data, selectedGid, onPick
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLButtonElement>(null);
+  const sidebarToggleRef = useRef<HTMLButtonElement>(null);
   const normalized = query.trim();
   const byId = new Map(data.nodes.map(node => [node.gid, node]));
   const visibleClients = normalized
@@ -36,20 +38,31 @@ export default function SidebarNav({ view, onNavigate, data, selectedGid, onPick
 
   useEffect(() => { if (searchOpen && !collapsed) searchRef.current?.focus(); }, [searchOpen, collapsed]);
   useEffect(() => { if (collapsed) { setSearchOpen(false); setQuery(''); } }, [collapsed]);
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 800px)').matches) return;
+    if (!collapsed) sidebarToggleRef.current?.focus();
+    else if (document.activeElement?.closest('#analytics-navigation')) mobileMenuRef.current?.focus();
+  }, [collapsed]);
 
   const closeSearch = () => { setSearchOpen(false); setQuery(''); requestAnimationFrame(() => searchTriggerRef.current?.focus()); };
 
-  return <aside className={`navigation-rail beautiful-sidebar ${collapsed ? 'collapsed' : ''}`} data-sidebar-collapsed={collapsed} aria-label="Навигация по аналитике">
+  return <>
+    <header className="mobile-header">
+      <button ref={mobileMenuRef} className="mobile-menu-toggle" type="button" onClick={onToggle} aria-label={collapsed ? 'Открыть меню' : 'Закрыть меню'} aria-expanded={!collapsed} aria-controls="analytics-navigation"><Menu size={20} /></button>
+      <span className="mobile-brand">Граф денег</span>
+      <span className="mobile-section">{sections.find(item => item.view === view)?.label}</span>
+    </header>
+    <aside id="analytics-navigation" className={`navigation-rail beautiful-sidebar ${collapsed ? 'collapsed' : ''}`} data-sidebar-collapsed={collapsed} aria-label="Навигация по аналитике">
     <div className="sidebar-inner">
       <header className="sidebar-header">
         <button className="sidebar-workspace-button" type="button" title="Открыть аналитический отчёт" aria-label="Открыть аналитический отчёт" tabIndex={collapsed ? -1 : 0} onClick={() => onNavigate('report')}>
           <span className="sidebar-monogram">Г</span><span className="sidebar-copy sidebar-workspace-name">Граф денег</span>
         </button>
-        <button className="sidebar-toggle" type="button" onClick={onToggle} aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'} title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button>
+        <button ref={sidebarToggleRef} className="sidebar-toggle" type="button" onClick={onToggle} aria-expanded={!collapsed} aria-controls="analytics-navigation" aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'} title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button>
       </header>
 
       <nav className="sidebar-primary" aria-label="Разделы">
-        <button className="sidebar-row sidebar-browse" type="button" onClick={onBrowseClients} title={collapsed ? 'Выбрать клиента' : undefined}><Search size={18} strokeWidth={1.8} /><span className="sidebar-copy">Выбрать клиента</span></button>
+        <button className="sidebar-row sidebar-browse" type="button" onClick={onBrowseClients} aria-label="Выбрать клиента" title={collapsed ? 'Выбрать клиента' : undefined}><Search size={18} strokeWidth={1.8} /><span className="sidebar-copy">Выбрать клиента</span></button>
         <div className="sidebar-primary-divider" />
         {sections.map(item => <button key={item.view} className={`sidebar-row ${view === item.view ? 'active' : ''}`} type="button" aria-label={item.label} aria-current={view === item.view ? 'page' : undefined} title={collapsed ? item.label : undefined} onClick={() => onNavigate(item.view)}><item.icon size={18} strokeWidth={1.8} /><span className="sidebar-copy">{item.label}</span></button>)}
       </nav>
@@ -69,5 +82,5 @@ export default function SidebarNav({ view, onNavigate, data, selectedGid, onPick
 
       <footer className="sidebar-footer"><span className="status-dot" /><span className="sidebar-copy">Локальная выборка<small>{data.metadata.date_from?.slice(0, 7) ?? 'Без даты'}</small></span></footer>
     </div>
-  </aside>;
+  </aside></>;
 }

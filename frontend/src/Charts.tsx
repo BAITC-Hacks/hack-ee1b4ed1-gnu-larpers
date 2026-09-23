@@ -58,15 +58,23 @@ export function RolesChart({ counts, total }: { counts: Record<Role, number>; to
     }));
 
   return <div className="data-chart roles-chart">
-    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-      <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 85, bottom: 0, left: 0 }} barSize={7} accessibilityLayer aria-label="Распределение клиентов по ролям">
-        <XAxis type="number" hide domain={[0, Math.max(1, ...Object.values(counts))]} />
-        <YAxis type="category" dataKey="label" width={112} tick={{ fill: '#c9c8cf', style: { fontSize: 10 } }} tickLine={false} axisLine={false} interval={0} />
-        <Tooltip {...tooltipProps} formatter={value => [`${number.format(Number(value))} · ${percent(total ? Number(value) / total : 0)}`, 'Клиентов']} />
-        <Bar dataKey="count" name="Клиентов" radius={[0, 3, 3, 0]} background={{ fill: '#323138', radius: 3 }} isAnimationActive={false}>
-          <LabelList dataKey="display" position="right" fill="#e8e8eb" style={{ fontSize: 10 }} offset={8} />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="roles-chart-wide">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 85, bottom: 0, left: 0 }} barSize={7} accessibilityLayer aria-label="Распределение клиентов по ролям">
+          <XAxis type="number" hide domain={[0, Math.max(1, ...Object.values(counts))]} />
+          <YAxis type="category" dataKey="label" width={112} tick={{ fill: '#c9c8cf', style: { fontSize: 10 } }} tickLine={false} axisLine={false} interval={0} />
+          <Tooltip {...tooltipProps} formatter={value => [`${number.format(Number(value))} · ${percent(total ? Number(value) / total : 0)}`, 'Клиентов']} />
+          <Bar dataKey="count" name="Клиентов" radius={[0, 3, 3, 0]} background={{ fill: '#323138', radius: 3 }} isAnimationActive={false}>
+            <LabelList dataKey="display" position="right" fill="#e8e8eb" style={{ fontSize: 10 }} offset={8} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+    <ul className="roles-chart-compact" aria-label="Распределение клиентов по ролям">
+      {rows.map(row => <li key={row.role}>
+        <div><span>{row.label}</span><strong>{row.display}</strong></div>
+        <div className="roles-chart-track" aria-hidden="true"><span style={{ width: percent(row.count / Math.max(1, ...Object.values(counts))), background: row.fill }} /></div>
+      </li>)}
+    </ul>
   </div>;
 }

@@ -19,26 +19,33 @@ function Workspace({ data }: { data: GraphData }) {
   const [role, setRole] = useState<Role | 'all'>('all');
   const [clusterId, setClusterId] = useState<number | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth <= 800);
+  const [mobileNavigation, setMobileNavigation] = useState(() => window.innerWidth <= 800);
   const [view, setView] = useState<'report' | 'visualization' | 'explore' | 'clusters' | 'method'>('report');
   const [visualizationMode, setVisualizationMode] = useState<'overview' | 'client'>('overview');
   const [exportsOpen, setExportsOpen] = useState(false);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [listLimit, setListLimit] = useState(50);
   const directorySearchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 800px)');
+    const update = () => { setMobileNavigation(media.matches); setSidebarCollapsed(media.matches); };
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [view]);
   useEffect(() => { if (directoryOpen) directorySearchRef.current?.focus(); }, [directoryOpen]);
   useEffect(() => {
-    if (!directoryOpen) return;
+    if (!directoryOpen && !(mobileNavigation && !sidebarCollapsed)) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previousOverflow; };
-  }, [directoryOpen]);
+  }, [directoryOpen, mobileNavigation, sidebarCollapsed]);
   const nodeById = useMemo(() => new Map(data.nodes.map(node => [node.gid, node])), [data]);
   const selected = nodeById.get(selectedGid)!;
   const filtered = useMemo(() => filterNodes(data, query, role, clusterId), [data, query, role, clusterId]);
   useEffect(() => { setListLimit(50); }, [query, role, clusterId]);
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setExportsOpen(false); setDirectoryOpen(false); } };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setExportsOpen(false); setDirectoryOpen(false); if (window.innerWidth <= 800) setSidebarCollapsed(true); } };
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
   }, []);
