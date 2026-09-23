@@ -14,7 +14,10 @@
 .overview-share-track{height:9px;margin:12px 0;background:#45404b;border-radius:3px;overflow:hidden}
 .overview-share-track span{display:block;height:100%;background:#a584d7}
 .overview-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(310px,.85fr);gap:18px;align-items:start;margin-top:18px}
-.overview-routes-panel,.overview-groups-panel{background:#1c1c20;border:1px solid #35343b;border-radius:8px;overflow:hidden;min-width:0}
+.overview-routes-panel,.overview-groups-panel,.overview-network-panel{background:#1c1c20;border:1px solid #35343b;border-radius:8px;overflow:hidden;min-width:0}
+.overview-network-panel{margin-top:18px}
+.overview-network-stage{height:clamp(460px,65vh,760px);background:#14131f}
+.overview-network-stage .network-graph{min-height:0!important}
 .overview-panel-heading{display:flex;align-items:start;justify-content:space-between;gap:16px;padding:23px 24px 18px;border-bottom:1px solid #36343a}
 .overview-panel-heading h3{font-size:18px;color:#ece9ef;font-weight:590;letter-spacing:-.3px;margin:7px 0 6px}
 .overview-panel-heading p{font-size:11px;line-height:1.55;color:#aaa6b0}

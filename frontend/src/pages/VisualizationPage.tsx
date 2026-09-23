@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Network } from 'lucide-react';
 import { roles, type EdgeRow, type GraphData, type NodeRow, type Role } from '../types';
 import { RoleBadge, number, percent, plural, shortId, shortMoney } from '../format';
+import NetworkGraph from '../NetworkGraph';
 
 function FlowGraph({ data, node, onSelect, expandSide }: { data: GraphData; node: NodeRow; onSelect: (gid: string) => void; expandSide?: 'in' | 'out' | null }) {
   const [expandedIn, setExpandedIn] = useState(false);
@@ -50,7 +51,7 @@ type MapParty = { gid?: string; label: string; role?: Role; amount: number; tran
 
 type GroupRoute = { src: number; dst: number; sumMinor: number; links: number; transfers: number };
 
-function NetworkOverview({ data, onSelectClient, onBrowseGroup }: { data: GraphData; onSelectClient: (gid: string) => void; onBrowseGroup: (id: number) => void }) {
+function NetworkOverview({ data, selectedGid, onSelectClient, onBrowseGroup }: { data: GraphData; selectedGid: string; onSelectClient: (gid: string) => void; onBrowseGroup: (id: number) => void }) {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
   const [showAllGroups, setShowAllGroups] = useState(false);
@@ -101,6 +102,11 @@ function NetworkOverview({ data, onSelectClient, onBrowseGroup }: { data: GraphD
     <section className="overview-summary" aria-label="Вся сеть в цифрах">
       <div className="overview-summary-title"><span className="eyebrow">Вся наблюдаемая сеть</span><h2>{number.format(data.metadata.n_nodes)} {plural(data.metadata.n_nodes, 'клиент', 'клиента', 'клиентов')} в {data.metadata.n_clusters} группах</h2><p>{number.format(data.metadata.n_edges)} направленных связей · {number.format(data.metadata.n_transactions)} переводов. Каждый клиент и каждый перевод включены в обзор.</p></div>
       <div className="overview-share"><div className="overview-share-label"><span>Внутри групп <strong>{shortMoney(overview.internalMinor / 100)}</strong></span><span>{percent(overview.internalMinor / totalMinor)}</span></div><div className="overview-share-track"><span style={{ width: percent(overview.internalMinor / totalMinor) }} /></div><div className="overview-share-label"><span>Между группами <strong>{shortMoney(overview.externalMinor / 100)}</strong></span><span>{percent(overview.externalMinor / totalMinor)}</span></div></div>
+    </section>
+    <section className="overview-network-panel" aria-label="Граф всех транзакций">
+      <div className="visualization-intro"><div><span className="eyebrow">Вся наблюдаемая сеть</span><h3>Граф всех транзакций</h3><p>Все {number.format(data.nodes.length)} клиентов и {number.format(data.edges.length)} направленных связей. Переводы от одного клиента другому объединены в одну связь. Нажмите на узел, чтобы изучить клиента.</p></div></div>
+      <div className="overview-network-stage"><NetworkGraph nodes={data.nodes} edges={data.edges} selectedGid={selectedGid} mode="overview" onSelect={onSelectClient} /></div>
+      <div className="graph-legend" aria-label="Роли клиентов">{Object.entries(roles).map(([key, item]) => <span key={key}><i style={{ background: item.color }} />{item.label}</span>)}</div>
     </section>
     <div className="overview-layout">
       <section className="overview-routes-panel" aria-label="Граф переводов между группами">
@@ -167,7 +173,7 @@ export default function VisualizationPage({ data, node, mode, onModeChange, onSe
   useEffect(() => { setExpandedSide(null); }, [node.gid]);
   return <>
     <div className="visualization-switch" role="tablist" aria-label="Масштаб визуализации"><button role="tab" aria-selected={mode === 'overview'} className={mode === 'overview' ? 'active' : ''} onClick={() => onModeChange('overview')}>Вся сеть</button><button role="tab" aria-selected={mode === 'client'} className={mode === 'client' ? 'active' : ''} onClick={() => onModeChange('client')}>Один клиент</button></div>
-    {mode === 'overview' ? <NetworkOverview data={data} onSelectClient={onSelectClient} onBrowseGroup={onBrowseGroup} /> : <>
+    {mode === 'overview' ? <NetworkOverview data={data} selectedGid={node.gid} onSelectClient={onSelectClient} onBrowseGroup={onBrowseGroup} /> : <>
       <div className="workspace-heading"><div><span>Связи выбранного клиента</span><h2 title={node.gid}>{node.gid}</h2></div><div className="workspace-actions"><button className="directory-trigger" onClick={onBrowseClients}>Выбрать клиента</button><button className="method-link" onClick={onOpenProfile}>Профиль и переводы</button></div></div>
       <section className="visualization-panel" aria-label="Граф прямых переводов">
         <div className="visualization-intro"><div><span className="eyebrow">Прямые переводы</span><h3>Кто отправлял и кому ушли средства</h3><p>Показаны до четырёх крупнейших связей по сумме с каждой стороны. Остальные объединены в одну группу.</p></div><div className="visualization-key"><span><i />Поступления</span><span><i />Отправления</span></div></div>
