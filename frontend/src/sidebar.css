@@ -20,7 +20,7 @@
 .beautiful-sidebar.collapsed .sidebar-toggle{left:8px;right:auto}
 .beautiful-sidebar .sidebar-copy{transition:opacity 180ms cubic-bezier(.16,1,.3,1),transform 180ms cubic-bezier(.16,1,.3,1);transform:translateX(0);opacity:1}
 .beautiful-sidebar.collapsed .sidebar-copy{opacity:0;transform:translateX(-8px);visibility:hidden}
-.beautiful-sidebar .sidebar-primary{display:flex;flex-direction:column;gap:1px;flex:none;width:224px}
+.beautiful-sidebar .sidebar-primary{display:flex;flex-direction:column;gap:4px;flex:none;width:224px}
 .beautiful-sidebar .sidebar-row{position:relative;display:flex;align-items:center;gap:8px;width:208px;height:34px;min-height:34px;margin:0 8px;padding:0 8px;border-radius:8px;text-align:left;color:#a8a4ae;font-size:13px;font-weight:530;white-space:nowrap;transition:background-color 150ms,color 150ms,transform 150ms}
 .beautiful-sidebar .sidebar-row svg{width:18px;height:18px;flex:none;color:#928c9a}
 .beautiful-sidebar .sidebar-row:hover{background:#2b292f;color:#efeaf3}
