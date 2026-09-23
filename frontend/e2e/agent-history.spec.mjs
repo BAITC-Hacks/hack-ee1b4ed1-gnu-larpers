@@ -89,14 +89,23 @@ async function ask(panel, question) {
 
 async function history(panel) {
   const saved = panel.getByRole('region', { name: 'Сохранённые чаты', exact: true });
-  if (!await saved.isVisible()) await panel.getByRole('button', { name: 'История чатов', exact: true }).click();
+  const toggle = panel.getByRole('button', { name: 'История чатов', exact: true });
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(saved).toBeVisible();
+  await expect(saved).toBeInViewport();
   return saved;
+}
+
+async function expectSidebarHidden(panel) {
+  await expect(panel.getByRole('button', { name: 'История чатов', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.getByRole('region', { name: 'Сохранённые чаты', exact: true })).not.toBeInViewport();
 }
 
 async function openChat(panel, question) {
   const saved = await history(panel);
   await saved.getByRole('button', { name: `Открыть чат ${question}`, exact: true }).click();
+  await expectSidebarHidden(panel);
 }
 
 async function expectPanelInViewport(page, panel) {
@@ -108,11 +117,27 @@ async function expectPanelInViewport(page, panel) {
   }).toBe(true);
 }
 
+async function expectSidebarBesideConversation(panel) {
+  const saved = panel.getByRole('region', { name: 'Сохранённые чаты', exact: true });
+  const log = panel.getByRole('log', { name: 'История диалога', exact: true });
+  await expect(saved).toBeVisible();
+  await expect(log).toBeVisible();
+  await expect.poll(async () => {
+    const sidebarBox = await saved.boundingBox();
+    const logBox = await log.boundingBox();
+    return sidebarBox !== null && logBox !== null
+      && sidebarBox.x + sidebarBox.width <= logBox.x + 1
+      && sidebarBox.y < logBox.y + logBox.height
+      && logBox.y < sidebarBox.y + sidebarBox.height;
+  }).toBe(true);
+}
+
 async function createTwoChats(panel) {
   const log = panel.getByRole('log', { name: 'История диалога', exact: true });
   await ask(panel, firstQuestion);
   await expect(log.getByText(firstAnswer, { exact: true })).toBeVisible();
   await panel.getByRole('button', { name: 'Новый диалог', exact: true }).click();
+  await expectSidebarHidden(panel);
   await expect(log.getByText(firstQuestion, { exact: true })).toHaveCount(0);
   await expect(log.getByText(firstAnswer, { exact: true })).toHaveCount(0);
   await ask(panel, secondQuestion);
@@ -139,6 +164,9 @@ test('saved agent chats stay separate, restore after reload and continue their o
     [secondFollowup]: { conversationId: 'conversation-second', summary: secondContinuation },
   });
   let panel = await visitAgent(page, inputs);
+  await expect(panel.getByRole('button', { name: 'История чатов', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await history(panel);
+  await expectSidebarBesideConversation(panel);
   await expect(panel.getByRole('textbox', { name: 'Ваш вопрос', exact: true })).toBeEnabled();
   await expect(panel.getByText(modelName, { exact: true })).toHaveCount(0);
   await expect(panel.getByTitle(`Текущая модель: ${modelName}`, { exact: true })).toHaveCount(0);
@@ -154,9 +182,12 @@ test('saved agent chats stay separate, restore after reload and continue their o
   await expect(log.getByText(secondAnswer, { exact: true })).toHaveCount(0);
   await page.reload();
   panel = await openAgent(page);
+  await expectSidebarHidden(panel);
   log = panel.getByRole('log', { name: 'История диалога', exact: true });
   await expect(log.getByText(firstAnswer, { exact: true })).toBeVisible();
   await expect(log.getByText(secondAnswer, { exact: true })).toHaveCount(0);
+  await history(panel);
+  await expectSidebarBesideConversation(panel);
   await ask(panel, firstFollowup);
   await expect(log.getByText(firstContinuation, { exact: true })).toBeVisible();
   await expect(log.getByText(firstAnswer, { exact: true })).toBeVisible();
@@ -177,16 +208,124 @@ test('saved agent chats stay separate, restore after reload and continue their o
   await openChat(panel, firstQuestion);
   await expect(log.getByText(firstContinuation, { exact: true })).toBeVisible();
   await expect(log.getByText(secondContinuation, { exact: true })).toHaveCount(0);
+  await expectPanelInViewport(page, panel);
+  await page.screenshot({ path: test.info().outputPath('agent-chat-desktop.png') });
   await expect((await history(panel)).getByRole('button', { name: /^Открыть чат / })).toHaveCount(2);
+  await expectSidebarBesideConversation(panel);
   await expectPanelInViewport(page, panel);
   await page.screenshot({ path: test.info().outputPath('agent-history-desktop.png') });
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  panel = await openAgent(page);
+  log = panel.getByRole('log', { name: 'История диалога', exact: true });
+  const toggle = panel.getByRole('button', { name: 'История чатов', exact: true });
+  const mobileHistory = panel.getByRole('region', { name: 'Сохранённые чаты', exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(mobileHistory).not.toBeInViewport();
   await expectPanelInViewport(page, panel);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(mobileHistory).toBeInViewport();
+  await expectPanelInViewport(page, panel);
+  await expectPanelInViewport(page, mobileHistory);
   await page.screenshot({ path: test.info().outputPath('agent-history-mobile.png') });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(mobileHistory).not.toBeInViewport();
   await openChat(panel, firstQuestion);
   await expect(log.getByText(firstContinuation, { exact: true })).toBeVisible();
   await expectPanelInViewport(page, panel);
   await page.screenshot({ path: test.info().outputPath('agent-chat-mobile.png') });
+});
+
+test('chat names persist through continuation and reload while search and deletion target the selected chat', async ({ page, baseURL }) => {
+  const inputs = await agentInputs(baseURL);
+  const renamedTitle = 'Разбор приоритета клиента';
+  const followup = 'Уточни выводы переименованного чата.';
+  const continuedAnswer = 'Ответ добавлен в переименованный чат.';
+  const requests = await mockAgent(page, inputs, {
+    ...initialReplies(),
+    [followup]: { conversationId: 'conversation-first', summary: continuedAnswer },
+  });
+  let panel = await visitAgent(page, inputs);
+  let log = await createTwoChats(panel);
+  let saved = await history(panel);
+  await saved.getByRole('button', { name: `Переименовать чат ${firstQuestion}`, exact: true }).click();
+  const titleInput = saved.getByRole('textbox', { name: 'Название чата', exact: true });
+  await expect(titleInput).toHaveValue(firstQuestion);
+  await titleInput.fill('   ');
+  await expect(saved.getByRole('button', { name: 'Сохранить название', exact: true })).toBeDisabled();
+  await titleInput.fill('Несохранённое название');
+  await saved.getByRole('button', { name: 'Отменить переименование', exact: true }).click();
+  await expect(saved.getByRole('button', { name: `Открыть чат ${firstQuestion}`, exact: true })).toBeVisible();
+  await expect(saved.getByRole('button', { name: 'Открыть чат Несохранённое название', exact: true })).toHaveCount(0);
+  await saved.getByRole('button', { name: `Переименовать чат ${firstQuestion}`, exact: true }).click();
+  await titleInput.fill(renamedTitle);
+  await saved.getByRole('button', { name: 'Сохранить название', exact: true }).click();
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toBeVisible();
+  await expect(saved.getByRole('button', { name: `Открыть чат ${firstQuestion}`, exact: true })).toHaveCount(0);
+  await expect(log.getByText(secondAnswer, { exact: true })).toBeVisible();
+  const search = saved.getByRole('textbox', { name: 'Поиск чатов', exact: true });
+  await search.fill('приоритета');
+  await expect(saved.getByRole('button', { name: /^Открыть чат / })).toHaveCount(1);
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toBeVisible();
+  await expect(saved.getByRole('button', { name: `Открыть чат ${secondQuestion}`, exact: true })).toHaveCount(0);
+  await search.fill('совпадений не существует');
+  await expect(saved.getByRole('button', { name: /^Открыть чат / })).toHaveCount(0);
+  await search.fill('');
+  await expect(saved.getByRole('button', { name: /^Открыть чат / })).toHaveCount(2);
+  await page.reload();
+  panel = await openAgent(page);
+  await expect(panel.getByRole('button', { name: 'История чатов', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  saved = await history(panel);
+  log = panel.getByRole('log', { name: 'История диалога', exact: true });
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toBeVisible();
+  await expect(log.getByText(secondAnswer, { exact: true })).toBeVisible();
+  await openChat(panel, renamedTitle);
+  await history(panel);
+  await expectSidebarBesideConversation(panel);
+  await ask(panel, followup);
+  await expect(log.getByText(continuedAnswer, { exact: true })).toBeVisible();
+  expect(requests.at(-1).conversation_id).toBe('conversation-first');
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toBeVisible();
+  await expect(saved.getByRole('button', { name: `Открыть чат ${firstQuestion}`, exact: true })).toHaveCount(0);
+  await page.reload();
+  panel = await openAgent(page);
+  saved = await history(panel);
+  log = panel.getByRole('log', { name: 'История диалога', exact: true });
+  await expect(log.getByText(continuedAnswer, { exact: true })).toBeVisible();
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toBeVisible();
+  await expectSidebarBesideConversation(panel);
+  await expectPanelInViewport(page, panel);
+  await page.screenshot({ path: test.info().outputPath('agent-chats-managed-desktop.png') });
+  await saved.getByRole('button', { name: `Удалить чат ${secondQuestion}`, exact: true }).click();
+  await expect(saved.getByRole('button', { name: 'Удалить чат', exact: true })).toBeVisible();
+  await saved.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await expect(saved.getByRole('button', { name: /^Открыть чат / })).toHaveCount(2);
+  await expect(saved.getByRole('button', { name: `Открыть чат ${secondQuestion}`, exact: true })).toBeVisible();
+  await saved.getByRole('button', { name: `Удалить чат ${renamedTitle}`, exact: true }).click();
+  await saved.getByRole('button', { name: 'Удалить чат', exact: true }).click();
+  await history(panel);
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toHaveCount(0);
+  await expect(saved.getByRole('button', { name: `Открыть чат ${secondQuestion}`, exact: true })).toBeVisible();
+  await expect(saved.getByRole('button', { name: /^Открыть чат / })).toHaveCount(1);
+  await expect(log.getByText(firstAnswer, { exact: true })).toHaveCount(0);
+  await expect(log.getByText(continuedAnswer, { exact: true })).toHaveCount(0);
+  await expect(log.getByText(secondAnswer, { exact: true })).toHaveCount(0);
+  await expect(panel.getByRole('textbox', { name: 'Ваш вопрос', exact: true })).toHaveValue('');
+  await expectSidebarBesideConversation(panel);
+  await page.reload();
+  panel = await openAgent(page);
+  saved = await history(panel);
+  log = panel.getByRole('log', { name: 'История диалога', exact: true });
+  await expect(saved.getByRole('button', { name: `Открыть чат ${renamedTitle}`, exact: true })).toHaveCount(0);
+  await expect(saved.getByRole('button', { name: /^Открыть чат / })).toHaveCount(1);
+  await expect(log.getByText(firstAnswer, { exact: true })).toHaveCount(0);
+  await expect(log.getByText(secondAnswer, { exact: true })).toHaveCount(0);
+  await openChat(panel, secondQuestion);
+  await expect(log.getByText(secondAnswer, { exact: true })).toBeVisible();
+  await expect(log.getByText(continuedAnswer, { exact: true })).toHaveCount(0);
+  expect(requests).toHaveLength(3);
 });
 
 test('switching chats cancels the pending request and does not append its late response elsewhere', async ({ page, baseURL }) => {

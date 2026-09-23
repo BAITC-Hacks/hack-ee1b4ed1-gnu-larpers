@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AGENT_CHAT_PREFIX, chatContinuationNotice, readAgentChats, saveActiveChat, saveAgentChat, type AgentChat } from './agent-history';
+import { AGENT_CHAT_PREFIX, agentChatTitle, chatContinuationNotice, deleteAgentChat, DeletedAgentChatError, readAgentChats, renameAgentChat, saveActiveChat, saveAgentChat, type AgentChat } from './agent-history';
 import type { GraphData } from './types';
 
 const gid = '9007199254740993';
@@ -12,6 +12,7 @@ function storage() {
     key: (index: number) => [...values.keys()][index] ?? null,
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
   };
 }
 
@@ -102,6 +103,49 @@ describe('saved agent chats', () => {
     const full = { ...saved, setItem: () => { throw new Error('QuotaExceededError'); } };
     expect(() => saveAgentChat(full, chat('chat-b'), data)).toThrow('QuotaExceededError');
     expect(readAgentChats(saved, data).chats).toEqual([chat()]);
+  });
+
+  it('preserves a renamed title when a stale tab appends a reply', () => {
+    const saved = storage();
+    const original = chat();
+    saveAgentChat(saved, original, data);
+    expect(agentChatTitle(original)).toBe(original.turns[0].question);
+    renameAgentChat(saved, original, '  Проверка переводов  ', data);
+    const followup = { ...original.turns[0], id: 'followup', question: 'Продолжение' };
+    saveAgentChat(saved, { ...original, turns: [...original.turns, followup] }, data);
+    const restored = readAgentChats(saved, data).chats[0];
+    expect(agentChatTitle(restored)).toBe('Проверка переводов');
+    expect(restored.turns).toHaveLength(2);
+    expect(() => renameAgentChat(saved, restored, '  ', data)).toThrow(/Название/);
+    expect(() => renameAgentChat(saved, restored, 'x'.repeat(121), data)).toThrow(/Название/);
+    expect(readAgentChats(saved, data).chats[0]).toEqual(restored);
+  });
+
+  it('deletes only the selected chat and rejects late saves from another tab', () => {
+    const saved = storage();
+    const first = chat();
+    const second = chat('chat-b');
+    saveAgentChat(saved, first, data);
+    saveAgentChat(saved, second, data);
+    saveActiveChat(saved, 'analysis-a', first.id);
+    deleteAgentChat(saved, first);
+    expect(saved.getItem(`${AGENT_CHAT_PREFIX}${first.id}`)).toBeNull();
+    expect(readAgentChats(saved, data)).toEqual({ chats: [second], activeId: null, unreadable: 0 });
+    expect(() => saveAgentChat(saved, first, data)).toThrow(DeletedAgentChatError);
+    expect(() => renameAgentChat(saved, first, 'Вернуть чат', data)).toThrow(DeletedAgentChatError);
+    expect(readAgentChats(saved, data).chats).toEqual([second]);
+  });
+
+  it('keeps history readable when deleting a record fails', () => {
+    const saved = storage();
+    const first = chat();
+    saveAgentChat(saved, first, data);
+    const failing = { ...saved, removeItem: (key: string) => {
+      if (key === `${AGENT_CHAT_PREFIX}${first.id}`) throw new Error('Storage unavailable');
+      saved.removeItem(key);
+    } };
+    expect(() => deleteAgentChat(failing, first)).toThrow('Storage unavailable');
+    expect(readAgentChats(saved, data).chats).toEqual([first]);
   });
 });
 
