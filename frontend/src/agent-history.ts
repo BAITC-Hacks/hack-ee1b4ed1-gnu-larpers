@@ -3,6 +3,7 @@ import type { GraphData } from './types';
 
 export const AGENT_CHAT_PREFIX = 'money-graph:agent-chat:';
 const ACTIVE_CHAT_PREFIX = 'money-graph:active-agent-chat:';
+const DELETED_CHAT_PREFIX = 'money-graph:deleted-agent-chat:';
 
 export interface AgentActivity {
   startedAt: number;
@@ -27,10 +28,19 @@ export interface AgentChat {
   createdAt: number;
   updatedAt: number;
   closed: boolean;
+  title?: string;
   turns: AgentTurn[];
 }
 
 type ChatStorage = Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem'>;
+
+export class DeletedAgentChatError extends Error {
+  constructor() { super('Этот чат уже удалён. Начните новый диалог.'); }
+}
+
+export function agentChatTitle(chat: AgentChat): string {
+  return chat.title || chat.turns[0].question;
+}
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Запись чата повреждена.');
@@ -79,7 +89,8 @@ function parseChat(value: unknown, data: GraphData): AgentChat {
     turnIds.add(turnId);
     return { id: turnId, question, selectedGid, response: parseAgentResponse(turn.response, data, id), activity: parseActivity(turn.activity) };
   });
-  return { version: 1, id, analysisId, createdAt, updatedAt, closed: row.closed, turns };
+  const title = row.title === undefined ? undefined : text(row.title, 120).trim();
+  return { version: 1, id, analysisId, createdAt, updatedAt, closed: row.closed, turns, ...(title ? { title } : {}) };
 }
 
 function chatKey(id: string): string {
@@ -99,6 +110,7 @@ export function readAgentChats(storage: ChatStorage, data: GraphData) {
       if (typeof row.analysisId === 'string' && row.analysisId !== data.metadata.analysis_id) continue;
       const chat = parseChat(row, data);
       if (chatKey(chat.id) !== key) throw new Error('Несовпадение ID чата.');
+      if (storage.getItem(`${DELETED_CHAT_PREFIX}${encodeURIComponent(chat.id)}`) !== null) continue;
       chats.push(chat);
     } catch { unreadable++; }
   }
@@ -109,15 +121,34 @@ export function readAgentChats(storage: ChatStorage, data: GraphData) {
 }
 
 export function saveAgentChat(storage: ChatStorage, chat: AgentChat, data: GraphData): AgentChat {
+  if (storage.getItem(`${DELETED_CHAT_PREFIX}${encodeURIComponent(chat.id)}`) !== null) throw new DeletedAgentChatError();
   const stored = storage.getItem(chatKey(chat.id));
   if (stored !== null) {
     const previous = parseChat(JSON.parse(stored), data);
     const turns = new Map(previous.turns.map(turn => [turn.id, turn]));
     for (const turn of chat.turns) turns.set(turn.id, turn);
-    chat = { ...chat, createdAt: Math.min(chat.createdAt, previous.createdAt), updatedAt: Math.max(chat.updatedAt, previous.updatedAt), turns: [...turns.values()].sort((left, right) => left.activity.startedAt - right.activity.startedAt) };
+    chat = { ...chat, ...(previous.title ? { title: previous.title } : {}), createdAt: Math.min(chat.createdAt, previous.createdAt), updatedAt: Math.max(chat.updatedAt, previous.updatedAt), turns: [...turns.values()].sort((left, right) => left.activity.startedAt - right.activity.startedAt) };
   }
   storage.setItem(chatKey(chat.id), JSON.stringify(chat));
   return chat;
+}
+
+export function renameAgentChat(storage: ChatStorage, chat: AgentChat, title: string, data: GraphData): AgentChat {
+  const trimmed = title.trim();
+  if (!trimmed || trimmed.length > 120) throw new Error('Название должно содержать от 1 до 120 символов.');
+  const updated = { ...saveAgentChat(storage, chat, data), title: trimmed };
+  storage.setItem(chatKey(chat.id), JSON.stringify(updated));
+  return updated;
+}
+
+export function deleteAgentChat(storage: ChatStorage & Pick<Storage, 'removeItem'>, chat: AgentChat): void {
+  const deletedKey = `${DELETED_CHAT_PREFIX}${encodeURIComponent(chat.id)}`;
+  storage.setItem(deletedKey, '1');
+  try { storage.removeItem(chatKey(chat.id)); }
+  catch (reason) {
+    storage.removeItem(deletedKey);
+    throw reason;
+  }
 }
 
 export function saveActiveChat(storage: ChatStorage, analysisId: string, id: string | null): void {

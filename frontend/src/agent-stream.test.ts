@@ -16,6 +16,7 @@ function finalResponse() {
     analysis_id: 'analysis-stream',
     conversation_id: 'conversation-stream',
     answer: {
+      kind: 'investigation',
       summary: 'В выборке есть направленная связь.',
       findings: [{ text: 'Клиенты связаны переводом.', evidence_ids: ['evidence-1'] }],
       hypotheses: [],
@@ -54,8 +55,8 @@ describe('agent streaming transport', () => {
       { type: 'status', phase: 'tool', tool: 'get_node', call_id: 'call-1', state: 'started' },
       { type: 'status', phase: 'tool', tool: 'get_node', call_id: 'call-1', state: 'completed' },
       { type: 'reasoning_delta', delta: 'Проверяю связи 🔎' },
-      { type: 'answer_preview', summary: 'В выборке', findings: [] },
-      { type: 'answer_preview', summary: 'В выборке есть направленная связь.', findings: ['Клиенты связаны переводом.'] },
+      { type: 'answer_preview', kind: 'investigation', summary: 'В выборке', findings: [] },
+      { type: 'answer_preview', kind: 'investigation', summary: 'В выборке есть направленная связь.', findings: ['Клиенты связаны переводом.'] },
       { type: 'status', phase: 'validating' },
     ];
     const bytes = new TextEncoder().encode([...updates, { type: 'result', response: finalResponse() }].map(value => event(value, '\r\n')).join(''));
@@ -73,6 +74,26 @@ describe('agent streaming transport', () => {
     const updates = vi.fn();
     await readAgentStream(responseFromChunks([new TextEncoder().encode(text)]), graph, null, updates, new AbortController().signal);
     expect(updates.mock.calls).toEqual([[{ type: 'status', phase: 'thinking' }]]);
+  });
+
+  it('normalizes legacy previews and final responses without an answer kind', async () => {
+    const result = finalResponse();
+    const { kind: _kind, ...answer } = result.answer;
+    const update = vi.fn();
+    await expect(readAgentStream(streamedResponse([
+      { type: 'answer_preview', summary: 'Предварительный ответ', findings: [] },
+      { type: 'result', response: { ...result, answer } },
+    ]), graph, null, update, new AbortController().signal)).resolves.toEqual(result);
+    expect(update).toHaveBeenCalledWith({ type: 'answer_preview', kind: 'investigation', summary: 'Предварительный ответ', findings: [] });
+  });
+
+  it('streams a clarification without requiring tools or investigation evidence', async () => {
+    const answer = { kind: 'clarification', summary: 'Что вы хотите узнать о выбранном клиенте?', findings: [], hypotheses: [], limitations: [] };
+    const result = { ...finalResponse(), answer, evidence: [] };
+    const preview = { type: 'answer_preview', kind: answer.kind, summary: answer.summary, findings: [] };
+    const update = vi.fn();
+    await expect(readAgentStream(streamedResponse([preview, { type: 'result', response: result }]), graph, 'conversation-stream', update, new AbortController().signal)).resolves.toEqual(result);
+    expect(update).toHaveBeenCalledExactlyOnceWith(preview);
   });
 
   it('finishes and releases the stream as soon as the verified result arrives', async () => {
@@ -146,6 +167,8 @@ describe('agent streaming transport', () => {
     [{ type: 'answer_preview', summary: 'x'.repeat(2401), findings: [] }, /размер события/],
     [{ type: 'answer_preview', summary: '', findings: Array(9).fill('Вывод') }, /много выводов/],
     [{ type: 'answer_preview', summary: '', findings: [false] }, /некорректный текст/],
+    [{ type: 'answer_preview', kind: 'unknown', summary: '', findings: [] }, /неизвестный тип ответа/],
+    [{ type: 'answer_preview', kind: 'clarification', summary: 'Уточните вопрос.', findings: ['Неожиданный вывод'] }, /неожиданные результаты исследования/],
     [{ type: 'status', phase: 'tool', tool: 'get_node', call_id: '', state: 'started' }, /вызов инструмента/],
     [{ type: 'status', phase: 'tool', tool: 'get_node', call_id: '1', state: 'unknown' }, /неизвестный этап/],
     [{ type: 'unknown' }, /неизвестное событие/],

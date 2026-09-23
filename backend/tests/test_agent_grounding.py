@@ -25,6 +25,7 @@ def case():
 def answer(evidence_id, field, value, **overrides):
     return Answer(
         **{
+            "kind": "investigation",
             "summary": "Интерпретация требует проверки аналитиком.",
             "claims": [Claim(evidence_id=evidence_id, field=field, value=value)],
             "hypotheses": [],
