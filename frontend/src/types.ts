@@ -90,10 +90,10 @@ export interface GraphData {
 }
 
 export const roles: Record<Role, { label: string; color: string; description: string }> = {
-  consolidator: { label: 'Сборщик', color: '#dbb36c', description: 'Концентрирует поступления от нескольких клиентов.' },
-  distributor: { label: 'Распределитель', color: '#aa9be1', description: 'Отправляет средства множеству получателей.' },
-  transit: { label: 'Транзит', color: '#68bbc1', description: 'Объёмы и даты совместимы с передачей средств дальше.' },
-  terminal: { label: 'Конечный узел', color: '#dc8f86', description: 'Дальнейших исходящих переводов в выборке не видно.' },
-  coordinator: { label: 'Связующий узел', color: '#95c490', description: 'Соединяет разные части наблюдаемого графа.' },
-  peripheral: { label: 'Периферия', color: '#93a19e', description: 'Мало связей или недостаточно наблюдений для другой роли.' },
+  consolidator: { label: 'Сборщик', color: '#e5b879', description: 'Концентрирует поступления от нескольких клиентов.' },
+  distributor: { label: 'Распределитель', color: '#a989ff', description: 'Отправляет средства множеству получателей.' },
+  transit: { label: 'Транзит', color: '#78c6ce', description: 'Объёмы и даты совместимы с передачей средств дальше.' },
+  terminal: { label: 'Конечный узел', color: '#e79aa8', description: 'Дальнейших исходящих переводов в выборке не видно.' },
+  coordinator: { label: 'Связующий узел', color: '#c7a4f6', description: 'Соединяет разные части наблюдаемого графа.' },
+  peripheral: { label: 'Периферия', color: '#858198', description: 'Мало связей или недостаточно наблюдений для другой роли.' },
 };
