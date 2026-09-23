@@ -48,4 +48,3 @@ export default function ReportPage({ data, onSelect, onCluster, onMethod }: {
     <section className="report-boundary"><CircleHelp size={20} /><div><strong>Как интерпретировать отчёт</strong><p>{number.format(data.metadata.n_boundary)} клиента находятся на границе наблюдения. У них могут быть переводы за пределами данных. Даты известны с точностью до дня, а роли и группы остаются аналитическими гипотезами.</p></div><button onClick={onMethod}>Методика <ArrowRight size={15} /></button></section>
   </div>;
 }
-

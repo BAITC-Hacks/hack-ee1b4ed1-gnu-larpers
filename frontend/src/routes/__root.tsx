@@ -7,6 +7,8 @@ import flowStylesheet from '../flow.css?url';
 import comfortStylesheet from '../comfort.css?url';
 import visualizationStylesheet from '../visualization.css?url';
 import overviewStylesheet from '../overview.css?url';
+import recordsStylesheet from '../records.css?url';
+import commandStylesheet from '../command-dialog.css?url';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -14,9 +16,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1.0' },
       { name: 'theme-color', content: '#0c0b13' },
-      { title: 'Граф денег · Аналитический отчёт' },
+      { title: 'Анализ транзакций · Аналитический отчёт' },
     ],
-    links: [stylesheet, sidebarStylesheet, flowStylesheet, comfortStylesheet, visualizationStylesheet, overviewStylesheet]
+    links: [stylesheet, sidebarStylesheet, flowStylesheet, comfortStylesheet, visualizationStylesheet, overviewStylesheet, recordsStylesheet, commandStylesheet]
       .map(href => ({ rel: 'stylesheet', href })),
   }),
   component: Outlet,

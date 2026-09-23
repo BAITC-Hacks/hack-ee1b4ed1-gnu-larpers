@@ -100,7 +100,7 @@ function NetworkOverview({ data, selectedGid, onSelectClient, onBrowseGroup }: {
   const groupName = (id: number) => `Группа ${id + 1}`;
   return <div className="network-overview">
     <section className="overview-summary" aria-label="Вся сеть в цифрах">
-      <div className="overview-summary-title"><span className="eyebrow">Вся наблюдаемая сеть</span><h2>{number.format(data.metadata.n_nodes)} {plural(data.metadata.n_nodes, 'клиент', 'клиента', 'клиентов')} в {data.metadata.n_clusters} группах</h2><p>{number.format(data.metadata.n_edges)} направленных связей · {number.format(data.metadata.n_transactions)} переводов. Каждый клиент и каждый перевод включены в обзор.</p></div>
+      <div className="overview-summary-title"><strong>{number.format(data.metadata.n_nodes)} {plural(data.metadata.n_nodes, 'клиент', 'клиента', 'клиентов')}</strong><span>{data.metadata.n_clusters} групп · {number.format(data.metadata.n_edges)} направленных связей · {number.format(data.metadata.n_transactions)} переводов</span></div>
       <div className="overview-share"><div className="overview-share-label"><span>Внутри групп <strong>{shortMoney(overview.internalMinor / 100)}</strong></span><span>{percent(overview.internalMinor / totalMinor)}</span></div><div className="overview-share-track"><span style={{ width: percent(overview.internalMinor / totalMinor) }} /></div><div className="overview-share-label"><span>Между группами <strong>{shortMoney(overview.externalMinor / 100)}</strong></span><span>{percent(overview.externalMinor / totalMinor)}</span></div></div>
     </section>
     <section className="overview-network-panel" aria-label="Граф всех транзакций">
@@ -174,7 +174,7 @@ export default function VisualizationPage({ data, node, mode, onModeChange, onSe
   return <>
     <div className="visualization-switch" role="tablist" aria-label="Масштаб визуализации"><button role="tab" aria-selected={mode === 'overview'} className={mode === 'overview' ? 'active' : ''} onClick={() => onModeChange('overview')}>Вся сеть</button><button role="tab" aria-selected={mode === 'client'} className={mode === 'client' ? 'active' : ''} onClick={() => onModeChange('client')}>Один клиент</button></div>
     {mode === 'overview' ? <NetworkOverview data={data} selectedGid={node.gid} onSelectClient={onSelectClient} onBrowseGroup={onBrowseGroup} /> : <>
-      <div className="workspace-heading"><div><span>Связи выбранного клиента</span><h2 title={node.gid}>{node.gid}</h2></div><div className="workspace-actions"><button className="directory-trigger" onClick={onBrowseClients}>Выбрать клиента</button><button className="method-link" onClick={onOpenProfile}>Профиль и переводы</button></div></div>
+      <div className="workspace-toolbar"><button className="directory-trigger" onClick={onBrowseClients}>Выбрать клиента</button><button className="method-link" onClick={onOpenProfile}>Профиль и переводы</button></div>
       <section className="visualization-panel" aria-label="Граф прямых переводов">
         <div className="visualization-intro"><div><span className="eyebrow">Прямые переводы</span><h3>Кто отправлял и кому ушли средства</h3><p>Показаны до четырёх крупнейших связей по сумме с каждой стороны. Остальные объединены в одну группу.</p></div><div className="visualization-key"><span><i />Поступления</span><span><i />Отправления</span></div></div>
         <RelationshipMap data={data} node={node} onSelect={onSelectClient} onShowMore={side => { setExpandedSide(side); document.getElementById('relationship-list')?.scrollIntoView({ behavior: 'smooth' }); }} />

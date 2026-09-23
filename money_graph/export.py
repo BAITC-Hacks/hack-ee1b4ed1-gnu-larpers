@@ -82,7 +82,7 @@ def _csv(frame: pd.DataFrame) -> str:
 def _report(analysis: Analysis) -> str:
     metadata = analysis.metadata
     lines = [
-        "# Граф денег — результаты анализа",
+        "# Анализ транзакций — результаты анализа",
         "",
         f"Узлы: {metadata['n_nodes']}; связи: {metadata['n_edges']}; "
         f"переводы: {metadata['n_transactions']}.",
