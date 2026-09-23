@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "remoteCache": {
+    "enabled": false
+  },
+  "tasks": {
+    "//#data": {
+      "inputs": ["money_graph/**/*.py", "data/*.parquet", "pyproject.toml", "uv.lock"],
+      "outputs": ["frontend/public/generated/**"]
+    },
+    "dev": {
+      "dependsOn": ["//#data"],
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["//#data"],
+      "outputs": ["dist/**"]
+    },
+    "preview": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
+    },
+    "check": {},
+    "//#check:python": {
+      "cache": false
+    }
+  }
+}

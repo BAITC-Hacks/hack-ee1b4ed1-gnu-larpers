@@ -4,9 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "data": "node scripts/prepare-data.mjs",
     "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
-    "start": "npm run data && npm run dev",
     "build": "vite build && tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1 --port 5174 --strictPort",
     "check": "tsc --noEmit && vitest run"
