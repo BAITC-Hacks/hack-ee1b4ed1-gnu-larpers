@@ -42,7 +42,38 @@
 .relationship-list-panel .flow-view-intro{display:none}
 .relationship-list-panel .flow-center{border-color:#51485d}
 .profile-workspace .details-panel{grid-column:auto;grid-row:auto;border:0;border-radius:0}
+.graph-breadcrumbs{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:0 0 22px;font-size:12px;color:#92899f}
+.graph-breadcrumbs button{color:#cdb0f1;text-align:left}
+.graph-breadcrumbs button:hover{text-decoration:underline}
+.graph-breadcrumbs strong{font-weight:550;color:#e4dce9;overflow-wrap:anywhere}
+.scope-graph-panel{display:block!important}
+.neighborhood-panel{margin-top:19px}
+.scope-network-stage{height:clamp(420px,62vh,680px);background:#14131f}
+.scope-network-stage .network-graph{min-height:0!important}
+.graph-scope-controls{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:17px 29px;border-bottom:1px solid #35343a}
+.graph-scope-controls>span{color:#a29aa9;font-size:11px}
+.external-control{display:flex;align-items:center;gap:8px;font-size:12px;color:#e3dbe9;cursor:pointer}
+.external-control input{accent-color:#b995eb;width:16px;height:16px;margin:0}
+.external-control span{color:#b3a5c3}
+.graph-scope-count{padding:14px 29px;color:#b7afc1;font-size:11px;line-height:1.65;border-bottom:1px solid #35343a}
+.graph-scope-count.truncated{color:#e5c795;background:#2e2824}
+.graph-legend i.external-marker{width:10px;height:10px;border:2px dotted #b8acc9;background:transparent}
+.graph-clients{border-top:1px solid #35343a}
+.graph-clients summary{padding:16px 29px;color:#d1b8ee;font-size:12px;cursor:pointer}
+.graph-clients summary:hover{background:#28232f}
+.graph-client-search{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;padding:0 29px 16px;font-size:11px;color:#a69bac}
+.graph-client-search label{display:flex;flex-direction:column;gap:7px;max-width:350px;width:100%}
+.graph-client-search input{width:100%;padding:9px 11px;border:1px solid #4b4355;border-radius:5px;background:#24202d;color:#ece4f4;font-size:12px}
+.graph-client-search>span{white-space:nowrap;padding-bottom:9px}
+.graph-client-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:355px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#514a5b transparent}
+.graph-client-list button{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 15px;padding:13px 29px;text-align:left;border-top:1px solid #302d37}
+.graph-client-list button:nth-child(odd){border-right:1px solid #302d37}
+.graph-client-list button:hover,.graph-client-list button.selected{background:#302637}
+.graph-client-list strong{font-size:12px;color:#eee5f6;font-weight:550;overflow-wrap:anywhere}
+.graph-client-list button>span:last-child{width:100%;color:#a698b2;font-size:10px}
+.graph-clients .role-badge{font-size:10px}
 
 @media(max-width:1050px){.visualization-intro{padding:23px}.map-party{padding:11px 10px}.map-party-heading{display:block}.map-party-heading>span{display:block;margin-top:4px}.map-party-subtitle{margin-top:6px}.map-focus>strong{font-size:13px}}
 @media(max-width:900px){.relationship-map-panel{display:none}.relationship-list-panel{margin-top:0}.relationship-list-panel .flow-center{order:-1;align-self:stretch;margin-top:0;min-height:0}.relationship-list-panel .flow-columns{display:flex;flex-direction:column}.relationship-list-panel .flow-column{width:100%}.relationship-list-panel .flow-center::before,.relationship-list-panel .flow-center::after{display:none}}
 @media(max-width:650px){.visualization-intro{display:block;padding:20px 18px 7px}.visualization-intro h3{font-size:18px}.visualization-intro p{font-size:12px}.visualization-key{margin-top:17px}.visualization-note{padding:12px 18px 17px}.relationship-list-heading{padding:18px;display:block}.relationship-list-heading>span{display:block;margin-top:12px}.relationship-list-panel .flow-view{padding:17px 18px}}
+@media(max-width:650px){.scope-graph-panel .visualization-intro{padding-bottom:17px}.scope-graph-panel .scope-control{margin-top:15px;width:max-content}.graph-scope-controls,.graph-scope-count,.graph-clients summary{padding-left:18px;padding-right:18px}.graph-client-search{padding-left:18px;padding-right:18px}.graph-client-list{grid-template-columns:1fr}.graph-client-list button{padding-left:18px;padding-right:18px}.graph-client-list button:nth-child(odd){border-right:0}.scope-network-stage{height:440px}}

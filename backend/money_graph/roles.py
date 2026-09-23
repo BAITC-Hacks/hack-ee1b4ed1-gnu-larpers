@@ -1,5 +1,38 @@
 ROLES = ("consolidator", "transit", "distributor", "terminal", "coordinator", "peripheral")
 
+PRIORITY_LABELS = {
+    "betweenness": "Посредничество",
+    "turnover": "Оборот",
+    "transactions": "Число переводов",
+    "seed_sources": "Источники seed",
+    "role_support": "Поддержка роли",
+    "temporal": "Временное сопоставление",
+}
+
+
+def priority_explanation(row: dict) -> str:
+    components = sorted(row["priority_components"].items(), key=lambda item: -item[1])
+    contributions = "; ".join(f"{PRIORITY_LABELS[name]}: {value:.6f}" for name, value in components)
+    explanation = (
+        f"Приоритет {row['priority_score']:.6f}. Вклады с учётом весов: {contributions}. "
+        f"Наблюдения: {row['evidence']}"
+    )
+    if row["temporal_right_censored"]:
+        explanation += "; последующие дни наблюдаются не полностью"
+    return explanation
+
+
+def priority_contributions(row: dict, support: float) -> dict[str, float]:
+    values = {
+        "betweenness": 0.25 * row["betweenness_percentile"],
+        "turnover": 0.20 * row["turnover_percentile"],
+        "transactions": 0.15 * row["tx_percentile"],
+        "seed_sources": 0.15 * min(1.0, row["seed_sources"] / 5),
+        "role_support": 0.15 * support,
+        "temporal": 0.10 * ((row["following_days_out_share"] or 0.0) if not row["is_seed"] else 0),
+    }
+    return values if row["in_deg"] + row["out_deg"] else dict.fromkeys(values, 0.0)
+
 
 def classify(row: dict) -> dict:
     incoming, outgoing = row["in_deg"], row["out_deg"]
@@ -20,7 +53,10 @@ def classify(row: dict) -> dict:
         return {
             "role": "peripheral",
             "role_score": 0.0,
+            "role_candidates": [],
+            "role_margin": None,
             "priority_score": 0.0,
+            "priority_components": priority_contributions(row, 0.0),
             "role_status": "insufficient_observation",
             "flags": flags,
             "evidence": (
@@ -64,7 +100,10 @@ def classify(row: dict) -> dict:
             + 0.20 * min(1.0, row["seed_sources"] / 5)
             + 0.20 * min(1.0, total_degree / 10)
         )
-    role = max(scores, key=lambda name: (scores[name], -ROLES.index(name)))
+    ranked_roles = sorted(scores, key=lambda name: (-scores[name], ROLES.index(name)))
+    role = ranked_roles[0]
+    candidates = [{"role": name, "score": round(scores[name], 6)} for name in ranked_roles]
+    margin = scores[role] - scores[ranked_roles[1]] if len(ranked_roles) > 1 else None
     support = scores[role]
     status = "observed_pattern"
     if row["truncated_by_depth"] and role == "terminal":
@@ -74,14 +113,8 @@ def classify(row: dict) -> dict:
         support = min(support, 0.35)
     if role == "transit" and row["temporal_right_censored"]:
         support *= 0.85
-    priority = (
-        0.25 * row["betweenness_percentile"]
-        + 0.20 * row["turnover_percentile"]
-        + 0.15 * row["tx_percentile"]
-        + 0.15 * min(1.0, row["seed_sources"] / 5)
-        + 0.15 * support
-        + 0.10 * (temporal if not row["is_seed"] else 0.0)
-    )
+    components = priority_contributions(row, support)
+    priority = sum(components.values())
     evidence = (
         f"Вх: {row['in_kzt']:.2f}₸/{incoming} контр.; "
         f"исх: {row['out_kzt']:.2f}₸/{outgoing}; "
@@ -102,7 +135,10 @@ def classify(row: dict) -> dict:
     return {
         "role": role,
         "role_score": round(support, 6),
+        "role_candidates": candidates,
+        "role_margin": round(margin, 6) if margin is not None else None,
         "priority_score": round(priority, 6),
+        "priority_components": components,
         "role_status": status,
         "flags": flags,
         "evidence": evidence[:200],

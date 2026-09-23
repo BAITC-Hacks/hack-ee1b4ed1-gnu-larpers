@@ -8,6 +8,11 @@ export function getRouter() {
 
   return createRouter({
     routeTree,
+    parseSearch: search => Object.fromEntries(new URLSearchParams(search)),
+    stringifySearch: search => {
+      const value = new URLSearchParams(Object.entries(search).filter((entry): entry is [string, string] => typeof entry[1] === 'string')).toString();
+      return value ? `?${value}` : '';
+    },
     context: { queryClient },
     scrollRestoration: true,
     defaultPendingComponent: AppLoading,

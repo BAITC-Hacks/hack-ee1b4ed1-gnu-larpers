@@ -9,6 +9,21 @@ export default defineConfig({
     }),
     react(),
   ],
-  server: { host: '127.0.0.1', port: 5174, strictPort: true },
-  preview: { host: '127.0.0.1', port: 5174, strictPort: true },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/cytoscape/')) return 'graph';
+        },
+      },
+    },
+  },
+  server: {
+    host: '127.0.0.1', port: 5173, strictPort: true,
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      ...(process.env.MONEY_GRAPH_AGENT === '1' ? { '/generated': 'http://127.0.0.1:8000' } : {}),
+    },
+  },
+  preview: { host: '127.0.0.1', port: 5173, strictPort: true },
 });

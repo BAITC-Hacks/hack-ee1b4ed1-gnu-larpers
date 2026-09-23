@@ -6,6 +6,9 @@ export interface NodeRow {
   is_seed: boolean;
   role: Role;
   role_score: number;
+  role_candidates?: { role: Role; score: number }[];
+  role_margin?: number | null;
+  priority_components?: Record<string, number>;
   cluster_id: number;
   priority_score: number;
   evidence: string;
@@ -68,6 +71,8 @@ export interface DailyRow {
 
 export interface GraphData {
   metadata: {
+    analysis_id?: string;
+    dataset_sha256?: string;
     schema_version: number;
     n_nodes: number;
     n_edges: number;

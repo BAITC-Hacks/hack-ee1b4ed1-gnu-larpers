@@ -89,6 +89,23 @@ export function parseGraphData(value: unknown): GraphData {
     numericFields(row, ['depth', 'cluster_id', 'in_deg', 'out_deg', 'in_tx', 'out_tx', 'in_minor', 'out_minor', 'seed_sources', 'active_days', 'same_day_activity_days', 'following_days_matched_minor', 'window_days', 'cycle_component_size', 'neighbor_clusters'], path, true);
     numericFields(row, ['in_kzt', 'out_kzt'], path);
     for (const field of ['role_score', 'priority_score']) score(row[field], `${path}.${field}`);
+    if (row.role_candidates !== undefined) {
+      const candidates = rows(row.role_candidates, `${path}.role_candidates`);
+      const seenRoles = new Set<string>();
+      for (const candidate of candidates) {
+        role(candidate.role, `${path}.role_candidates.role`);
+        score(candidate.score, `${path}.role_candidates.score`);
+        if (seenRoles.has(candidate.role)) fail(`${path}.role_candidates`, 'повторяющаяся роль');
+        seenRoles.add(candidate.role);
+      }
+    }
+    if (row.role_margin !== undefined && row.role_margin !== null) score(row.role_margin, `${path}.role_margin`);
+    if (row.priority_components !== undefined) {
+      const components = object(row.priority_components, `${path}.priority_components`);
+      for (const value of Object.values(components)) score(value, `${path}.priority_components`);
+      const total = Object.values(components).reduce<number>((sum, value) => sum + (value as number), 0);
+      if (Math.abs(total - (row.priority_score as number)) > 0.00001) fail(`${path}.priority_components`, 'сумма вкладов отличается от приоритета');
+    }
     if (row.pass_through !== null) number(row.pass_through, `${path}.pass_through`);
     if (row.following_days_out_share !== null) score(row.following_days_out_share, `${path}.following_days_out_share`);
     for (const field of ['is_seed', 'truncated_by_depth']) boolean(row[field], `${path}.${field}`);
@@ -226,6 +243,32 @@ export function selectNeighborhood(data: GraphData, gid: string, hops: 1 | 2, ma
   const visible = new Set(nodes.map((node) => node.gid));
   const edges = data.edges.filter((edge) => visible.has(edge.src) && visible.has(edge.dst));
   return { nodes, edges, totalNodes: candidates.length, truncated: nodes.length < candidates.length };
+}
+
+export function selectClusterGraph(data: GraphData, clusterId: number, includeExternal: boolean) {
+  const members = data.nodes.filter(node => node.cluster_id === clusterId).sort(priorityOrder);
+  const memberIds = new Set(members.map(node => node.gid));
+  const internalEdges: EdgeRow[] = [];
+  const externalEdges: EdgeRow[] = [];
+  const externalIds = new Set<string>();
+  for (const edge of data.edges) {
+    const sourceMember = memberIds.has(edge.src);
+    const targetMember = memberIds.has(edge.dst);
+    if (sourceMember && targetMember) internalEdges.push(edge);
+    else if (sourceMember || targetMember) {
+      externalEdges.push(edge);
+      externalIds.add(sourceMember ? edge.dst : edge.src);
+    }
+  }
+  const externalNodes = data.nodes.filter(node => externalIds.has(node.gid)).sort(priorityOrder);
+  return {
+    nodes: includeExternal ? [...members, ...externalNodes] : members,
+    edges: includeExternal ? [...internalEdges, ...externalEdges] : internalEdges,
+    memberCount: members.length,
+    externalCount: externalNodes.length,
+    internalEdgeCount: internalEdges.length,
+    externalEdgeCount: externalEdges.length,
+  };
 }
 
 export function transactionsForNode(data: GraphData, gid: string, from: string, to: string): Transaction[] {

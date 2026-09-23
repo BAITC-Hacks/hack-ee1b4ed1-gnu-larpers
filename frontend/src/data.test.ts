@@ -105,6 +105,30 @@ describe('parseGraphData', () => {
     data.top_nodes = [];
     expect(parseGraphData(data).nodes[0].gid).toBe(b);
   });
+
+  it('preserves alternative roles and checked priority contributions from the analysis', () => {
+    const data = fixture();
+    data.nodes[0].role_candidates = [{ role: 'coordinator', score: 0.91 }, { role: 'distributor', score: 0.89 }];
+    data.nodes[0].role_margin = 0.02;
+    data.nodes[0].priority_components = { betweenness: 0.25, turnover: 0.2, transactions: 0.15, seed_sources: 0.15, role_support: 0.15, temporal: 0 };
+    const parsed = parseGraphData(JSON.parse(JSON.stringify(data)));
+    expect(parsed.nodes[0].role_candidates).toEqual(data.nodes[0].role_candidates);
+    expect(parsed.nodes[0].role_margin).toBe(0.02);
+    expect(parsed.nodes[0].priority_components).toEqual(data.nodes[0].priority_components);
+  });
+
+  it.each([
+    ['role_candidates', [{ role: 'unknown', score: 0.7 }]],
+    ['role_candidates', [{ role: 'transit', score: 1.1 }]],
+    ['role_candidates', [{ role: 'transit', score: 0.7 }, { role: 'transit', score: 0.6 }]],
+    ['role_margin', -0.1],
+    ['priority_components', { turnover: 0.7 }],
+    ['priority_components', { turnover: Infinity }],
+  ])('rejects malformed explanation field %s', (field, value) => {
+    const data = fixture();
+    Object.assign(data.nodes[0], { [field]: value });
+    expect(() => parseGraphData(data)).toThrow(field);
+  });
 });
 
 describe('filterNodes', () => {

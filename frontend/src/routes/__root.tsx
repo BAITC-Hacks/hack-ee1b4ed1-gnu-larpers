@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import radixStylesheet from '@radix-ui/themes/styles.css?url';
 import stylesheet from '../styles.css?url';
 import sidebarStylesheet from '../sidebar.css?url';
 import flowStylesheet from '../flow.css?url';
 import comfortStylesheet from '../comfort.css?url';
 import visualizationStylesheet from '../visualization.css?url';
 import overviewStylesheet from '../overview.css?url';
+import graphExplorerStylesheet from '../graph-explorer.css?url';
+import agentStylesheet from '../agent-panel.css?url';
 import responsiveStylesheet from '../responsive.css?url';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -17,7 +20,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: 'theme-color', content: '#0c0b13' },
       { title: 'Граф денег · Аналитический отчёт' },
     ],
-    links: [stylesheet, sidebarStylesheet, flowStylesheet, comfortStylesheet, visualizationStylesheet, overviewStylesheet, responsiveStylesheet]
+    links: [radixStylesheet, stylesheet, sidebarStylesheet, flowStylesheet, comfortStylesheet, visualizationStylesheet, overviewStylesheet, graphExplorerStylesheet, agentStylesheet, responsiveStylesheet]
       .map(href => ({ rel: 'stylesheet', href })),
   }),
   component: Outlet,
