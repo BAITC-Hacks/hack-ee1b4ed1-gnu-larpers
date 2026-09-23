@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowDownLeft, ArrowRight, ArrowUpRight, Check, ChevronDown, ChevronRight,
-  CircleHelp, Copy, Download, GitBranch, Layers3, LoaderCircle, Network,
+  CircleHelp, Copy, Download, GitBranch, Layers3, Network,
   Search, ShieldCheck, SlidersHorizontal, Users, X,
 } from 'lucide-react';
 import NetworkGraph from './NetworkGraph';
-import { dailyForNode, filterNodes, parseGraphData, selectNeighborhood, transactionsForNode } from './data';
+import { dailyForNode, filterNodes, selectNeighborhood, transactionsForNode } from './data';
+import { AppLoading } from './AppLoading';
+import { graphQueryOptions } from './queries/graph';
 import { roles, type DailyRow, type GraphData, type NodeRow, type Role } from './types';
+import { WorkspaceProvider, useWorkspaceStore } from './stores/workspace-context';
 
 const number = new Intl.NumberFormat('ru-RU');
 const moneyFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
@@ -111,18 +115,19 @@ function Methodology({ data }: { data: GraphData }) {
 }
 
 function Workspace({ data }: { data: GraphData }) {
-  const [selectedGid, setSelectedGid] = useState(data.top_nodes[0]?.gid ?? data.nodes[0].gid);
-  const [query, setQuery] = useState('');
-  const [role, setRole] = useState<Role | 'all'>('all');
-  const [clusterId, setClusterId] = useState<number | null>(null);
-  const [scope, setScope] = useState<1 | 2 | 'all'>(1);
-  const [view, setView] = useState<'explore' | 'clusters' | 'method'>('explore');
+  return <WorkspaceProvider data={data}><WorkspaceContent data={data} /></WorkspaceProvider>;
+}
+
+function WorkspaceContent({ data }: { data: GraphData }) {
+  const {
+    selectedGid, query, role, clusterId, scope, view, listLimit,
+    setQuery, setRole, setClusterId, setScope, setView, showMore,
+    selectNode, reset, openCluster,
+  } = useWorkspaceStore();
   const [exportsOpen, setExportsOpen] = useState(false);
-  const [listLimit, setListLimit] = useState(50);
   const nodeById = useMemo(() => new Map(data.nodes.map(node => [node.gid, node])), [data]);
   const selected = nodeById.get(selectedGid)!;
   const filtered = useMemo(() => filterNodes(data, query, role, clusterId), [data, query, role, clusterId]);
-  useEffect(() => { setListLimit(50); }, [query, role, clusterId]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExportsOpen(false); };
     window.addEventListener('keydown', escape);
@@ -134,17 +139,6 @@ function Workspace({ data }: { data: GraphData }) {
     const ids = new Set(nodes.map(node => node.gid));
     return { nodes, edges: data.edges.filter(edge => ids.has(edge.src) && ids.has(edge.dst)), totalNodes: nodes.length, truncated: false };
   }, [data, selectedGid, scope, clusterId]);
-  const selectNode = (gid: string) => {
-    const node = nodeById.get(gid);
-    if (!node) return;
-    setSelectedGid(gid);
-    setView('explore');
-    if (clusterId !== null && clusterId !== node.cluster_id) setClusterId(null);
-    if (role !== 'all' && role !== node.role) setRole('all');
-    if (query && !gid.includes(query.trim())) setQuery('');
-  };
-  const reset = () => { setQuery(''); setRole('all'); setClusterId(null); };
-  const openCluster = (id: number, gid: string) => { setSelectedGid(gid); setClusterId(id); setRole('all'); setQuery(''); setScope('all'); setView('explore'); };
   return <div className="app-shell">
     <aside className="navigation-rail"><a href="#" className="brand" aria-label="Граф денег — исследование" onClick={event => { event.preventDefault(); setView('explore'); }}><Network size={24} strokeWidth={1.6} /></a><div className="rail-rule" /><nav aria-label="Основная навигация"><button className={view === 'explore' ? 'active' : ''} onClick={() => setView('explore')} title="Исследование" aria-label="Исследование" aria-current={view === 'explore' ? 'page' : undefined}><GitBranch size={21} /></button><button className={view === 'clusters' ? 'active' : ''} onClick={() => setView('clusters')} title="Группы клиентов" aria-label="Группы клиентов" aria-current={view === 'clusters' ? 'page' : undefined}><Layers3 size={21} /></button><button className={view === 'method' ? 'active' : ''} onClick={() => setView('method')} title="Методика" aria-label="Методика" aria-current={view === 'method' ? 'page' : undefined}><CircleHelp size={21} /></button></nav><div className="rail-bottom"><span className="status-dot" /><span>LOCAL</span></div></aside>
     <div className="page-content">
@@ -156,7 +150,7 @@ function Workspace({ data }: { data: GraphData }) {
           <div className="workspace-heading"><div><h2>Исследование графа</h2><span>Выберите клиента, чтобы увидеть его связи и основания роли</span></div><button className="text-button" onClick={() => setView('method')}><CircleHelp size={14} />Как читать результаты</button></div>
           <div className="investigation-workspace">
             <aside className="client-list-panel"><div className="list-heading"><h3>Приоритетные клиенты</h3><SlidersHorizontal size={16} /></div><label className="search-field"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Найти по полному ID или части" aria-label="Поиск клиента по ID" />{query && <button className="icon-button" aria-label="Очистить поиск" onClick={() => setQuery('')}><X size={13} /></button>}</label><div className="list-filters"><select aria-label="Фильтр по роли" value={role} onChange={event => setRole(event.target.value as Role | 'all')}><option value="all">Все роли</option>{Object.entries(roles).map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}</select><select aria-label="Фильтр по группе" value={clusterId ?? 'all'} onChange={event => setClusterId(event.target.value === 'all' ? null : Number(event.target.value))}><option value="all">Все группы</option>{data.clusters.map(cluster => <option key={cluster.cluster_id} value={cluster.cluster_id}>Группа {cluster.cluster_id + 1} · {cluster.n_nodes}</option>)}</select></div><div className="list-count"><span>Клиентов: {number.format(filtered.length)} · по приоритету</span>{(query || role !== 'all' || clusterId !== null) && <button onClick={reset}>Сбросить</button>}</div>
-              <div className="client-list">{filtered.slice(0, listLimit).map((node, index) => <button key={node.gid} onClick={() => selectNode(node.gid)} className={`client-row ${selectedGid === node.gid ? 'selected' : ''}`} aria-label={`Клиент ${node.gid}, ${roles[node.role].label}`} aria-pressed={selectedGid === node.gid}><span className="client-rank">{String(index + 1).padStart(2, '0')}</span><div className="client-row-main"><div className="row-id"><span title={node.gid}>{shortId(node.gid)}</span>{node.is_seed && <span className="seed-mark" title="Исходный клиент">S</span>}</div><RoleBadge role={node.role} /></div><span className="row-score">{node.priority_score.toFixed(2)}<div style={{ width: percent(node.priority_score) }} /></span></button>)}{!filtered.length && <div className="list-empty"><Search size={22} /><strong>Клиенты не найдены</strong><p>Измените ID или сбросьте фильтры.</p><button className="text-button" onClick={reset}>Сбросить фильтры</button></div>}{filtered.length > listLimit && <button className="load-more" onClick={() => setListLimit(limit => limit + 50)}>Показать ещё 50</button>}</div><div className="list-footer">Фильтры применяются к списку клиентов</div>
+              <div className="client-list">{filtered.slice(0, listLimit).map((node, index) => <button key={node.gid} onClick={() => selectNode(node.gid)} className={`client-row ${selectedGid === node.gid ? 'selected' : ''}`} aria-label={`Клиент ${node.gid}, ${roles[node.role].label}`} aria-pressed={selectedGid === node.gid}><span className="client-rank">{String(index + 1).padStart(2, '0')}</span><div className="client-row-main"><div className="row-id"><span title={node.gid}>{shortId(node.gid)}</span>{node.is_seed && <span className="seed-mark" title="Исходный клиент">S</span>}</div><RoleBadge role={node.role} /></div><span className="row-score">{node.priority_score.toFixed(2)}<div style={{ width: percent(node.priority_score) }} /></span></button>)}{!filtered.length && <div className="list-empty"><Search size={22} /><strong>Клиенты не найдены</strong><p>Измените ID или сбросьте фильтры.</p><button className="text-button" onClick={reset}>Сбросить фильтры</button></div>}{filtered.length > listLimit && <button className="load-more" onClick={showMore}>Показать ещё 50</button>}</div><div className="list-footer">Фильтры применяются к списку клиентов</div>
             </aside>
             <section className="graph-panel" aria-label="Граф переводов"><div className="graph-toolbar"><div><span className="graph-status" />{scope === 'all' ? clusterId === null ? 'Весь граф' : `Группа ${clusterId + 1}` : 'Окружение клиента'}</div><div className="scope-control" aria-label="Глубина отображения">{([1, 2, 'all'] as const).map(value => <button key={value} onClick={() => setScope(value)} className={scope === value ? 'active' : ''} aria-pressed={scope === value}>{value === 'all' ? 'Обзор' : `${value} ${value === 1 ? 'шаг' : 'шага'}`}</button>)}</div></div><div className="graph-stage"><NetworkGraph nodes={graph.nodes} edges={graph.edges} selectedGid={selectedGid} mode={scope === 'all' ? 'overview' : 'focus'} onSelect={selectNode} /></div><div className="graph-legend">{Object.entries(roles).map(([key, item]) => <span key={key}><i style={{ background: item.color }} />{item.label}</span>)}</div><div className="graph-footer"><span>Узлов: {graph.nodes.length} · связей: {graph.edges.length}</span><span>{graph.truncated ? `Показаны ${graph.nodes.length} из ${graph.totalNodes} по приоритету` : 'Стрелки показывают направление перевода'}</span></div></section>
             <ClientDetails node={selected} data={data} />
@@ -173,19 +167,9 @@ function Workspace({ data }: { data: GraphData }) {
 }
 
 export default function App() {
-  const [data, setData] = useState<GraphData | null>(null);
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    setError('');
-    fetch('/generated/graph.json', { signal: controller.signal })
-      .then(response => { if (!response.ok) throw new Error('Не удалось загрузить результаты анализа.'); return response.json(); })
-      .then(value => setData(parseGraphData(value)))
-      .catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Ошибка загрузки данных.'); });
-    return () => controller.abort();
-  }, [attempt]);
-  if (error) return <div className="app-state"><Network size={38} /><h1>Данные пока недоступны</h1><p>{error}</p><p>Подготовьте выгрузку командой <code>npm run data</code> в папке фронтенда.</p><button className="export-button" onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</button></div>;
-  if (!data) return <div className="app-state"><Network size={38} /><h1>Граф денег</h1><p><LoaderCircle size={17} className="spinner" />Загружаем результаты анализа</p></div>;
+  const { data, error, isFetching, refetch } = useQuery(graphQueryOptions);
+  if (!data && isFetching) return <AppLoading />;
+  if (error) return <div className="app-state"><Network size={38} /><h1>Данные пока недоступны</h1><p>{error.message}</p><p>Подготовьте выгрузку командой <code>npm run data</code> в папке фронтенда.</p><button className="export-button" onClick={() => void refetch()}>Повторить загрузку</button></div>;
+  if (!data) return <AppLoading />;
   return <Workspace data={data} />;
 }
