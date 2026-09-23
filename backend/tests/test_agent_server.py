@@ -46,6 +46,7 @@ def request_body(store, **overrides):
 async def successful_runner(request, investigation, history, model):
     result = investigation.execute("get_node", gid=request.selected_gid)
     answer = Answer(
+        kind="investigation",
         summary="Наблюдаемый конец цепочки на границе выгрузки.",
         claims=[Claim(evidence_id=result["evidence_id"], field="truncated_by_depth", value=True)],
         hypotheses=[],
@@ -129,6 +130,7 @@ def test_unverified_model_references_are_not_rendered(store, monkeypatch):
 
     async def ungrounded(*args):
         return Answer(
+            kind="investigation",
             summary="Unsupported claim",
             claims=[Claim(evidence_id="invented", field="gid", value="999")],
             hypotheses=[],
@@ -267,6 +269,7 @@ class ScriptedModel(Model):
             result = json.loads(outputs[-1]["output"])
             assert result["data"]["paths"] == [["100000000000000001", "100000000000000002"]]
             answer = Answer(
+                kind="investigation",
                 summary="Найден направленный путь.",
                 claims=[
                     Claim(evidence_id=result["evidence_id"], field="total_seed_sources", value=1),

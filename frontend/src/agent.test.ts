@@ -36,6 +36,7 @@ describe('agent response evidence validation', () => {
     expect(result.evidence[0].paths[0].node_ids).toEqual([a, b, c]);
     expect(result.evidence[0].facts).toEqual([{ label: 'Переходов', value: '2' }]);
     expect(result.answer.findings[0].evidence_ids).toEqual(['path-1']);
+    expect(result.answer.kind).toBe('investigation');
   });
 
   it.each([
@@ -83,6 +84,33 @@ describe('agent response evidence validation', () => {
     value.evidence = [];
     value.answer.findings = [];
     expect(parseAgentResponse(value, data, 'conversation-a').evidence).toEqual([]);
+  });
+
+  it('accepts a clarification in the same conversation without evidence or analytical sections', () => {
+    const value = {
+      ...response(),
+      answer: { kind: 'clarification', summary: 'Что вы хотите узнать о выбранном клиенте?', findings: [], hypotheses: [], limitations: [] },
+      evidence: [],
+    };
+    expect(parseAgentResponse(value, data, 'conversation-a')).toEqual(value);
+  });
+
+  it.each(['findings', 'hypotheses', 'limitations', 'evidence'])('rejects a clarification containing %s', field => {
+    const investigation = response();
+    const value = {
+      ...investigation,
+      answer: { kind: 'clarification', summary: 'Уточните вопрос.', findings: [], hypotheses: [], limitations: [] },
+      evidence: [],
+    };
+    if (field === 'evidence') Object.assign(value, { evidence: investigation.evidence });
+    else if (field === 'findings') Object.assign(value, { answer: { ...value.answer, findings: investigation.answer.findings }, evidence: investigation.evidence });
+    else Object.assign(value.answer, { [field]: ['Неожиданный результат исследования.'] });
+    expect(() => parseAgentResponse(value, data, null)).toThrow(/неожиданные результаты исследования/);
+  });
+
+  it('rejects unknown answer kinds', () => {
+    const value = response();
+    expect(() => parseAgentResponse({ ...value, answer: { ...value.answer, kind: 'unknown' } }, data, null)).toThrow(/неизвестный тип ответа/);
   });
 });
 
