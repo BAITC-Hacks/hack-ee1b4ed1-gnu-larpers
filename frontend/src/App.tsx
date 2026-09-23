@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Download, LoaderCircle, Network, X } from 'lucide-react';
+import { ChevronDown, Download, Network, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import SidebarNav from './SidebarNav';
-import { filterNodes, parseGraphData } from './data';
+import { filterNodes } from './data';
+import { AppLoading } from './AppLoading';
+import { graphQueryOptions } from './queries/graph';
 import { roles, type GraphData, type Role } from './types';
 import { dateLabel, number, plural } from './format';
 import ReportPage from './pages/ReportPage';
@@ -80,19 +83,8 @@ function Workspace({ data }: { data: GraphData }) {
 }
 
 export default function App() {
-  const [data, setData] = useState<GraphData | null>(null);
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    setError('');
-    fetch('/generated/graph.json', { signal: controller.signal })
-      .then(response => { if (!response.ok) throw new Error('Не удалось загрузить результаты анализа.'); return response.json(); })
-      .then(value => setData(parseGraphData(value)))
-      .catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Ошибка загрузки данных.'); });
-    return () => controller.abort();
-  }, [attempt]);
-  if (error) return <div className="app-state"><Network size={38} /><h1>Данные пока недоступны</h1><p>{error}</p><p>Подготовьте выгрузку командой <code>npm run data</code> в папке фронтенда.</p><button className="export-button" onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</button></div>;
-  if (!data) return <div className="app-state"><Network size={38} /><h1>Граф денег</h1><p><LoaderCircle size={17} className="spinner" />Загружаем результаты анализа</p></div>;
+  const { data, error, refetch } = useQuery(graphQueryOptions);
+  if (error) return <div className="app-state"><Network size={38} /><h1>Данные пока недоступны</h1><p>{error.message}</p><p>Подготовьте выгрузку командой <code>npm run data</code> в корне проекта.</p><button className="export-button" onClick={() => void refetch()}>Повторить загрузку</button></div>;
+  if (!data) return <AppLoading />;
   return <Workspace data={data} />;
 }

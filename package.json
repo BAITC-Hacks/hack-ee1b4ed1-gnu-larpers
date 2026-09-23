@@ -1,33 +1,24 @@
 {
-  "name": "money-graph-aml",
+  "name": "money-graph",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "analyze": "node --import tsx src/analyze.ts",
-    "start": "npm run analyze && vite --host 127.0.0.1",
-    "dev": "vite --host 127.0.0.1",
-    "build": "npm run analyze && tsc --noEmit && vite build",
-    "check": "tsc --noEmit && vitest run"
+  "packageManager": "npm@11.17.0",
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0",
+    "npm": ">=11"
   },
-  "dependencies": {
-    "cytoscape": "^3.30.4",
-    "graphology": "^0.26.0",
-    "graphology-communities-louvain": "^2.0.2",
-    "graphology-metrics": "^2.4.0",
-    "hyparquet": "^1.26.0",
-    "hyparquet-compressors": "^1.1.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "preview": "turbo run preview",
+    "check": "turbo run check check:python",
+    "data": "uv run --frozen money-graph --data data --out frontend/public/generated",
+    "check:python": "uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen pytest -q"
   },
   "devDependencies": {
-    "@types/cytoscape": "^3.21.9",
-    "@types/node": "^24.4.0",
-    "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.7",
-    "vitest": "^4.1.11"
+    "turbo": "2.11.3"
   }
 }
