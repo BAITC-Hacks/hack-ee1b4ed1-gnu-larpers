@@ -3,6 +3,7 @@ import { DailyTransfersChart } from '../Charts';
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, ShieldCheck } from 'lucide-react';
 import { dailyForNode, transactionsForNode } from '../data';
 import { roles, type DailyRow, type GraphData, type NodeRow } from '../types';
+import { priorityComponentsForNode, priorityFactors } from '../priority';
 import { RoleBadge, dateLabel, money, percent, plural, shortId, shortMoney } from '../format';
 import '../role-explanation.css';
 
@@ -39,26 +40,22 @@ function DailyChart({ rows }: { rows: DailyRow[] }) {
 
 const scoreFormat = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 3, maximumFractionDigits: 6 });
 
-const priorityLabels: Record<string, string> = {
-  betweenness: 'Связующее положение в графе',
-  turnover: 'Объём переводов',
-  transactions: 'Количество переводов',
-  seed_sources: 'Связь с исходными клиентами',
-  role_support: 'Поддержка роли после поправок',
-  temporal: 'Сопоставление объёмов по датам',
-};
-
 function PriorityBreakdown({ node }: { node: NodeRow }) {
-  const entries = Object.entries(node.priority_components ?? {});
-  if (!entries.length) return <p className="priority-unavailable">Разложение приоритета отсутствует в этой версии анализа.</p>;
+  const components = priorityComponentsForNode(node);
+  if (!components) return <p className="priority-unavailable">Для этой выгрузки нельзя восстановить точные вклады. Обновите результаты анализа.</p>;
+  const entries = Object.entries(components);
   const total = entries.reduce((sum, [, value]) => sum + value, 0);
-  return <details className="priority-breakdown">
-    <summary>Из чего складывается приоритет</summary>
-    <dl>{entries.map(([key, value]) => <div key={key}>
-      <dt>{priorityLabels[key] ?? key}</dt><dd>{scoreFormat.format(value)}</dd>
-    </div>)}<div className="priority-total"><dt>Сумма вкладов</dt><dd>{scoreFormat.format(total)}</dd></div></dl>
-    <p>Вклады уже учитывают веса признаков. Итог показан с округлением.</p>
-  </details>;
+  return <section className="priority-breakdown" aria-label="Состав приоритета">
+    <h4>Из чего складывается приоритет</h4>
+    <dl>{entries.map(([key, value]) => {
+      const factor = priorityFactors.find(item => item.key === key);
+      const detail = node.in_deg + node.out_deg === 0 ? 'Нет внешних связей'
+        : key === 'temporal' && node.is_seed ? 'Для исходного клиента не учитывается'
+        : factor ? `${factor.basis} × ${factor.weight.toFixed(2).replace('.', ',')}` : 'Взвешенный вклад';
+      return <div key={key}><dt><span>{factor?.label ?? key}</span><small>{detail}</small></dt><dd>{scoreFormat.format(value)}</dd></div>;
+    })}<div className="priority-total"><dt>Сумма вкладов</dt><dd>{scoreFormat.format(total)}</dd></div></dl>
+    <p>Сумма равна приоритету с учётом округления.</p>
+  </section>;
 }
 
 function RoleHypotheses({ node }: { node: NodeRow }) {

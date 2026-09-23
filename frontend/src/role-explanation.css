@@ -4,10 +4,11 @@
   border-top: 1px solid #48404f;
 }
 
-.priority-breakdown summary {
+.priority-breakdown h4 {
+  margin: 0;
   color: #d1c1e4;
   font-size: 11px;
-  cursor: pointer;
+  font-weight: 600;
 }
 
 .priority-breakdown dl {
@@ -24,13 +25,25 @@
 }
 
 .priority-breakdown dt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
   color: #aaa1b4;
+}
+
+.priority-breakdown dt small {
+  color: #8f879b;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 .priority-breakdown dd {
   margin: 0;
   color: #ddd1eb;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .priority-breakdown dl > .priority-total {
