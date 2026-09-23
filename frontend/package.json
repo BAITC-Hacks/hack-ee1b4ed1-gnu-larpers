@@ -4,12 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "start:agent": "node scripts/start-agent.mjs",
     "build": "vite build && tsc --noEmit",
-    "preview": "vite preview --host 127.0.0.1 --port 5174 --strictPort",
-    "check": "tsc --noEmit && vitest run"
+    "preview": "vite preview --host 127.0.0.1 --port 5173 --strictPort",
+    "check": "tsc --noEmit && vitest run",
+    "check:e2e": "playwright test"
   },
   "dependencies": {
+    "@radix-ui/themes": "^3.3.0",
     "@tanstack/react-query": "^5.103.2",
     "@tanstack/react-router": "^1.170.38",
     "@tanstack/react-start": "^1.168.57",
@@ -21,6 +24,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/cytoscape": "^3.21.9",
     "@types/node": "^24.4.0",
     "@types/react": "^19.1.13",

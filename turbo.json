@@ -5,7 +5,7 @@
   },
   "tasks": {
     "//#data": {
-      "inputs": ["money_graph/**/*.py", "data/*.parquet", "pyproject.toml", "uv.lock"],
+      "inputs": ["backend/money_graph/**/*.py", "data/*.parquet", "backend/pyproject.toml", "backend/uv.lock"],
       "outputs": ["frontend/public/generated/**"]
     },
     "dev": {

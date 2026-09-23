@@ -1,0 +1,261 @@
+.case-notebook {
+  margin-bottom: 22px;
+  border: 1px solid #39363f;
+  border-radius: 8px;
+  background: #1d1d21;
+}
+
+.case-notebook-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 18px;
+  color: #ddd4e8;
+  text-align: left;
+  font-size: 12px;
+}
+
+.case-notebook-toggle > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.case-notebook-count {
+  color: #9f96ab;
+  font-size: 11px;
+}
+
+.case-notebook-toggle[aria-expanded="true"] .case-notebook-count svg {
+  transform: rotate(180deg);
+}
+
+.case-notebook-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 28px;
+  border-top: 1px solid #39363f;
+  padding: 22px;
+}
+
+.case-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 11px;
+}
+
+.case-section-heading h2,
+.case-section-heading h3 {
+  font-size: 13px;
+  color: #e0d9e9;
+}
+
+.case-section-heading h3 span {
+  color: #9f91b4;
+  margin-left: 5px;
+}
+
+.case-section-heading button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #baa5dc;
+}
+
+.case-help,
+.case-warning,
+.case-notice {
+  font-size: 11px;
+  line-height: 1.65;
+  color: #a49bab;
+}
+
+.case-draft label {
+  display: block;
+  color: #c3b7d1;
+  font-size: 11px;
+  margin: 15px 0 7px;
+}
+
+.case-draft input,
+.case-draft textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  background: #25232a;
+  border: 1px solid #49434f;
+  border-radius: 6px;
+  color: #e0d8e9;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.case-draft textarea {
+  resize: vertical;
+}
+
+.case-context {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 15px 0;
+  font-size: 11px;
+  color: #a59bac;
+  overflow-wrap: anywhere;
+}
+
+.case-context strong {
+  color: #c4b4d5;
+  font-weight: 500;
+}
+
+.case-evidence-add,
+.case-saved-actions,
+.case-evidence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.case-evidence-add {
+  margin: 15px 0 22px;
+}
+
+.case-evidence-add button,
+.case-saved-actions button,
+.case-evidence-actions button {
+  border: 1px solid #4b4356;
+  border-radius: 5px;
+  padding: 7px 9px;
+  font-size: 11px;
+  color: #c6b5dd;
+}
+
+.case-notebook button:hover:not(:disabled) {
+  background: #302b38;
+}
+
+.case-notebook button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.case-evidence-list,
+.case-saved-list {
+  display: grid;
+  gap: 12px;
+}
+
+.case-evidence-card,
+.case-saved-card {
+  border: 1px solid #3c3743;
+  border-radius: 6px;
+  padding: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.case-evidence-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  color: #d2c4e0;
+  font-size: 11px;
+}
+
+.case-evidence-heading button {
+  flex: none;
+  color: #afa0bc;
+  padding: 2px;
+}
+
+.case-evidence-card dl {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.case-evidence-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.case-evidence-card dt {
+  color: #988bA5;
+}
+
+.case-evidence-card dd {
+  margin: 0;
+  max-width: 65%;
+  text-align: right;
+  color: #c2b6ce;
+}
+
+.case-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  padding: 10px 13px;
+  border-radius: 6px;
+  background: #3b304b;
+  border: 1px solid #635075;
+  font-size: 12px;
+  color: #e9def5;
+}
+
+.case-saved-card h3 {
+  font-size: 12px;
+  color: #d8cce6;
+}
+
+.case-saved-card p {
+  margin-top: 7px;
+  color: #968ca1;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.case-saved-card .case-saved-notes {
+  white-space: pre-wrap;
+  color: #b2a6be;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.case-saved-actions {
+  margin-top: 13px;
+}
+
+.case-notice {
+  padding: 12px 18px;
+  border-top: 1px solid #39363f;
+  color: #bda6dd;
+}
+
+.case-notebook .case-warning {
+  color: #dec099;
+}
+
+@media (max-width: 900px) {
+  .case-notebook-content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 17px;
+  }
+}

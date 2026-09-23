@@ -12,11 +12,14 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "start": "npm run dev",
+    "start:agent": "npm run start:agent --workspace frontend",
     "build": "turbo run build",
     "preview": "turbo run preview",
     "check": "turbo run check check:python",
-    "data": "uv run --frozen money-graph --data data --out frontend/public/generated",
-    "check:python": "uv run --frozen ruff check . && uv run --frozen ruff format --check . && uv run --frozen pytest -q"
+    "data": "uv run --project backend --frozen --no-sync money-graph --data data --out frontend/public/generated",
+    "check:python": "uv run --project backend --frozen --extra agent ruff check backend && uv run --project backend --frozen --extra agent ruff format --check backend && uv run --project backend --frozen --extra agent pytest backend/tests -q",
+    "check:e2e": "npm run check:e2e --workspace frontend"
   },
   "devDependencies": {
     "turbo": "2.11.3"

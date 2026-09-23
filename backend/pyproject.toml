@@ -14,8 +14,16 @@ dependencies = [
   "scipy>=1.14,<2",
 ]
 
+[project.optional-dependencies]
+agent = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "openai-agents>=0.3,<1",
+]
+
 [project.scripts]
 money-graph = "money_graph.cli:main"
+money-graph-server = "money_graph.server:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1"]

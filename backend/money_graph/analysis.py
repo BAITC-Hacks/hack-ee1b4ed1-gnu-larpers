@@ -8,7 +8,7 @@ import pandas as pd
 
 from money_graph import __version__
 from money_graph.dataset import Dataset, validate_dataset
-from money_graph.roles import classify
+from money_graph.roles import classify, priority_explanation
 from money_graph.temporal import daily_flows, temporal_features
 
 
@@ -141,7 +141,9 @@ def _features(
         len(set(graph.predecessors(gid)) & set(graph.successors(gid)) - {gid}) for gid in rows.gid
     ]
     daily = daily_flows(dataset.transactions)
-    temporal = temporal_features(daily, config.window_days)
+    temporal = temporal_features(
+        daily, config.window_days, observation_end=dataset.transactions.date.max()
+    )
     defaults = {
         "active_days": 0,
         "same_day_activity_days": 0,
@@ -234,7 +236,9 @@ def analyze(dataset: Dataset, config: Config | None = None) -> Analysis:
     nodes = pd.concat([features, classification], axis=1)
     clusters = _cluster_rows(nodes, dataset.edges)
     top = nodes.sort_values(["priority_score", "gid"], ascending=[False, True]).head(config.top_n)
-    top = top[["gid", "role", "priority_score", "evidence"]].rename(columns={"evidence": "why"})
+    explanations = [priority_explanation(row) for row in top.to_dict("records")]
+    top = top[["gid", "role", "priority_score"]].copy()
+    top["why"] = explanations
     top.insert(0, "rank", range(1, len(top) + 1))
     canonical = "\n".join(
         frame.to_csv(index=False) for frame in (dataset.nodes, dataset.edges, dataset.transactions)
@@ -281,5 +285,9 @@ def analyze(dataset: Dataset, config: Config | None = None) -> Analysis:
             "Self-transfers are preserved but excluded from role and temporal features.",
         ],
     }
+    identity = {key: metadata[key] for key in ("dataset_sha256", "analysis_version", "parameters")}
+    metadata["analysis_id"] = hashlib.sha256(
+        json.dumps(identity, sort_keys=True).encode()
+    ).hexdigest()
     json.dumps(metadata, allow_nan=False)
     return Analysis(dataset, nodes, clusters, top.reset_index(drop=True), daily, metadata)

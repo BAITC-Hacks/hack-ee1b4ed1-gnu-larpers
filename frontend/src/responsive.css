@@ -1,0 +1,134 @@
+.mobile-header { display: none; }
+.beautiful-sidebar .sidebar-row { justify-content: flex-start; }
+.beautiful-sidebar nav .sidebar-copy { display: inline; }
+.beautiful-sidebar.collapsed .sidebar-row { width: 36px; }
+.app-shell { min-height: 100dvh; }
+.roles-chart { container-type: inline-size; height: auto; }
+.roles-chart-wide { height: 252px; }
+.roles-chart-compact { display: none; list-style: none; padding: 0; margin: 0; }
+
+@container (max-width: 360px) {
+  .roles-chart-wide { display: none; }
+  .roles-chart-compact { display: grid; gap: 19px; }
+  .roles-chart-compact li > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; color: #c9c8cf; }
+  .roles-chart-compact strong { flex: none; font-size: 11px; font-weight: 550; color: #e8e8eb; }
+  .roles-chart-track { height: 6px; margin-top: 8px; border-radius: 3px; background: #323138; overflow: hidden; }
+  .roles-chart-track span { display: block; height: 100%; border-radius: inherit; }
+}
+
+@media (max-width: 1000px) {
+  .page-heading > div:first-child, .workspace-heading > div:first-child { min-width: 0; }
+  .page-heading { flex-wrap: wrap; }
+  .workspace-heading, .workspace-actions { flex-wrap: wrap; }
+  .report-hero { grid-template-columns: minmax(0, 1fr); }
+  .hero-total { border-left: 0; border-top: 1px solid #3c3a43; padding: 21px 0 0; }
+}
+
+@media (max-width: 800px) {
+  html { scroll-padding-top: calc(76px + env(safe-area-inset-top)); }
+  .mobile-header { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: env(safe-area-inset-top) 16px 0; border-bottom: 1px solid #303036; background: #1a1a1d; }
+  .mobile-menu-toggle { display: grid; place-items: center; width: 44px; height: 44px; flex: none; margin-left: -8px; border-radius: 8px; color: #c8aae9; }
+  .mobile-menu-toggle:hover { background: #2b292f; }
+  .mobile-brand { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .mobile-section { margin-left: auto; min-width: 0; color: #a8a4ae; font-size: 11px; text-align: right; }
+  .beautiful-sidebar { width: min(288px, calc(100vw - 48px)); max-height: 100dvh; padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(14px, env(safe-area-inset-bottom)); transition: transform 200ms ease, visibility 200ms; }
+  .beautiful-sidebar.collapsed { width: min(288px, calc(100vw - 48px)); transform: translateX(-100%); visibility: hidden; pointer-events: none; }
+  .beautiful-sidebar .sidebar-inner, .beautiful-sidebar .sidebar-primary { width: 100%; }
+  .beautiful-sidebar .sidebar-row, .sidebar-client-row { width: calc(100% - 16px); height: 44px; min-height: 44px; }
+  .sidebar-client-row { width: 100%; }
+  .sidebar-toggle { width: 44px; height: 44px; top: 0; }
+  .sidebar-workspace-button { height: 44px; top: 0; }
+  .sidebar-clients { margin-top: 14px; }
+  .sidebar-clients-heading { height: 44px; min-height: 44px; }
+  .sidebar-clients-title { top: 14px; }
+  .sidebar-search-trigger { width: 44px; height: 44px; }
+  .sidebar-search-field { height: 44px; }
+  .sidebar-search-field.open { width: 100%; }
+  .sidebar-search-field input { font-size: 16px; }
+  .sidebar-search-field button { width: 32px; height: 32px; }
+  .page-content, .page-content.sidebar-collapsed { margin-left: 0; transition: none; }
+  .page-content main { padding: 24px 20px calc(88px + env(safe-area-inset-bottom)); }
+  .page-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .page-heading h1 { font-size: clamp(26px, 4.5vw, 34px); overflow-wrap: anywhere; }
+  .export-menu { left: 0; right: auto; width: min(280px, calc(100vw - 40px)); }
+  .export-button, .primary-action, .quiet-action, .directory-trigger, .method-link, .export-menu a { min-height: 44px; }
+  .workspace-heading { align-items: flex-start; flex-direction: column; }
+  .workspace-actions { width: 100%; gap: 8px 16px; }
+  .method-link { white-space: normal; text-align: left; }
+  .details-panel { display: block; padding: 22px; }
+  .details-panel .activity-section { padding-top: 18px; }
+  .panel-heading { gap: 10px; flex-wrap: wrap; }
+  .money-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-facts dd { flex: none; max-width: 45%; overflow-wrap: anywhere; }
+  .coverage-banner { flex-wrap: wrap; }
+  .coverage-banner p { flex-basis: 100%; }
+  .coverage-banner button { min-height: 44px; font-size: 12px; }
+  .transactions-heading { align-items: stretch; flex-direction: column; }
+  .transaction-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; width: 100%; }
+  .transaction-filters select { grid-column: 1 / -1; }
+  .transaction-filters input, .transaction-filters select { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; }
+  .transaction-filters > span { align-self: center; }
+  .table-scroll { overscroll-behavior-x: contain; }
+  .table-footer { flex-wrap: wrap; gap: 12px; }
+  .table-footer > div { margin-left: auto; }
+  .table-footer button, .icon-button { min-width: 44px; min-height: 44px; }
+  .page-footer { flex-wrap: wrap; gap: 10px 20px; }
+  .directory-panel { max-height: 100dvh; }
+  .directory-close { width: 44px; height: 44px; flex: none; }
+  .directory-controls input, .directory-controls select, .overview-group-search input, .graph-client-search input { min-height: 44px; font-size: 16px; }
+  .directory-count { flex-wrap: wrap; }
+  .directory-row-main strong { overflow-wrap: anywhere; }
+  .graph-control { width: 44px; height: 44px; }
+  .scope-control button, .visualization-switch button { min-height: 44px; }
+  .visualization-switch button { min-width: 0; }
+  .visualization-intro { flex-wrap: wrap; }
+  .visualization-intro .method-link { margin-top: 8px; }
+  .graph-client-search { flex-wrap: wrap; }
+  .graph-client-search label { max-width: none; }
+  .graph-client-search > span { padding-bottom: 0; }
+  .overview-panel-heading { flex-wrap: wrap; }
+  .overview-clear { min-height: 44px; text-align: left; }
+  .trace-agent-launcher { right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); min-height: 44px; }
+  .trace-agent-theme:has(.trace-agent-panel) { z-index: 58; }
+  .trace-agent-theme:has(.trace-agent-launcher[data-open="false"]) { z-index: 32; }
+}
+
+@media (max-width: 480px) {
+  .page-content main { padding-inline: 16px; }
+  .page-heading .eyebrow { font-size: 10px; }
+  .hero-total strong { font-size: clamp(32px, 9vw, 38px); letter-spacing: -1.5px; }
+  .report-card { padding: 18px 16px; }
+  .card-heading { flex-wrap: wrap; }
+  .report-row { flex-wrap: wrap; position: relative; padding-right: 20px; }
+  .report-row > svg:last-child { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+  .groups-report .report-row-title { flex-basis: 100%; }
+  .groups-report .report-row-value { text-align: left; }
+  .groups-report .report-row-value small { display: inline; margin-left: 6px; }
+  .report-boundary button { margin-left: 0; min-height: 44px; }
+  .money-pair { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .score-card > div:first-child, .support-line, .role-candidate-heading { flex-wrap: wrap; }
+  .transaction-filters { grid-template-columns: minmax(0, 1fr); }
+  .transaction-filters > span { display: none; }
+  .directory-heading { padding: 18px 16px 14px; gap: 8px; }
+  .directory-heading h2 { font-size: 21px; }
+  .directory-heading p { line-height: 1.5; }
+  .directory-controls { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .directory-controls input { grid-column: auto; }
+  .directory-row { padding-inline: 16px; }
+  .directory-count { padding-inline: 16px; }
+  .overview-share-label { flex-wrap: wrap; gap: 6px; }
+  .overview-group-row > span { flex-wrap: wrap; }
+  .overview-group-row small { text-align: left; }
+  .cluster-stats { flex-wrap: wrap; gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beautiful-sidebar { transition: none; }
+}
+
+@media (max-width: 800px) and (max-height: 600px) {
+  .beautiful-sidebar { overflow-y: auto; }
+  .beautiful-sidebar .sidebar-inner { height: auto; min-height: 100%; }
+  .sidebar-clients { flex: none; }
+  .sidebar-client-list { overflow: visible; }
+}

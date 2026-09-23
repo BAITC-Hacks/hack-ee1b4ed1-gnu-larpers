@@ -25,12 +25,17 @@ def daily_flows(transactions: pd.DataFrame) -> pd.DataFrame:
     return daily[columns].sort_values(["gid", "date"]).reset_index(drop=True)
 
 
-def temporal_features(daily: pd.DataFrame, window_days: int = 3) -> dict[int, dict]:
+def temporal_features(
+    daily: pd.DataFrame,
+    window_days: int = 3,
+    *,
+    observation_end: pd.Timestamp | None = None,
+) -> dict[int, dict]:
     if not 1 <= window_days <= 30:
         raise ValueError("window_days must be between 1 and 30")
     if daily.empty:
         return {}
-    end_date = daily.date.max()
+    end_date = observation_end if observation_end is not None else daily.date.max()
     result = {}
     for gid, rows in daily.groupby("gid", sort=True):
         lots = deque()

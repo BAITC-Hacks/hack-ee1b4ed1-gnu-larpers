@@ -11,6 +11,19 @@ import pandas as pd
 from money_graph.analysis import Analysis
 from money_graph.roles import ROLES
 
+CSV_SCHEMAS = {
+    "nodes_roles.csv": ["gid", "role", "role_score", "cluster_id", "priority_score", "evidence"],
+    "clusters.csv": [
+        "cluster_id",
+        "n_nodes",
+        "n_seed",
+        "sum_kzt_internal",
+        "top_gids",
+        "hypothesis",
+    ],
+    "top_nodes.csv": ["rank", "gid", "role", "priority_score", "why"],
+}
+
 
 def _plain(value):
     if value is None or value is pd.NA:
@@ -65,6 +78,8 @@ def validate_results(analysis: Analysis) -> None:
         raise ValueError("Top nodes must contain the requested number of ranked nodes")
     if top.gid.duplicated().any() or not set(top.gid) <= set(nodes.gid):
         raise ValueError("Top nodes contain duplicate or unknown identifiers")
+    if not top.why.str.strip().str.len().gt(0).all():
+        raise ValueError("Every ranked node must have a priority explanation")
 
 
 def _csv(frame: pd.DataFrame) -> str:
@@ -73,7 +88,11 @@ def _csv(frame: pd.DataFrame) -> str:
         if value is None:
             return "unavailable"
         if isinstance(value, list):
+            if any(isinstance(item, (dict, list)) for item in value):
+                return json.dumps(value, ensure_ascii=False, sort_keys=True)
             return ";".join(str(item) for item in value) if value else "none"
+        if isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False, sort_keys=True)
         return value
 
     return frame.map(cell).to_csv(index=False, lineterminator="\n")
@@ -127,9 +146,9 @@ def _report(analysis: Analysis) -> str:
     return "\n".join(lines)
 
 
-def write_outputs(analysis: Analysis, directory: Path) -> dict[str, Path]:
+def graph_payload(analysis: Analysis) -> dict:
     validate_results(analysis)
-    graph = {
+    return {
         "metadata": _plain(analysis.metadata),
         "nodes": _records(analysis.nodes),
         "edges": _records(analysis.dataset.edges),
@@ -138,12 +157,14 @@ def write_outputs(analysis: Analysis, directory: Path) -> dict[str, Path]:
         "daily_flows": _records(analysis.daily),
         "transactions": _records(analysis.dataset.transactions),
     }
-    required = ["gid", "role", "role_score", "cluster_id", "priority_score", "evidence"]
-    ordered_nodes = analysis.nodes[required + [c for c in analysis.nodes if c not in required]]
+
+
+def write_outputs(analysis: Analysis, directory: Path) -> dict[str, Path]:
+    graph = graph_payload(analysis)
     artifacts = {
-        "nodes_roles.csv": _csv(ordered_nodes),
-        "clusters.csv": _csv(analysis.clusters),
-        "top_nodes.csv": _csv(analysis.top_nodes),
+        "nodes_roles.csv": _csv(analysis.nodes[CSV_SCHEMAS["nodes_roles.csv"]]),
+        "clusters.csv": _csv(analysis.clusters[CSV_SCHEMAS["clusters.csv"]]),
+        "top_nodes.csv": _csv(analysis.top_nodes[CSV_SCHEMAS["top_nodes.csv"]]),
         "graph.json": json.dumps(graph, ensure_ascii=False, allow_nan=False, indent=2) + "\n",
         "summary.json": json.dumps(
             _plain(analysis.metadata), ensure_ascii=False, allow_nan=False, indent=2

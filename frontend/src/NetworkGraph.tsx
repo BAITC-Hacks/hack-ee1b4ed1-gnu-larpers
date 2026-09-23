@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react';
 import cytoscape, { type Core, type ElementDefinition, type Position } from 'cytoscape';
 import { Expand, Minus, Plus } from 'lucide-react';
 import { roles, type EdgeRow, type NodeRow } from './types';
+import { edgeId } from './agent';
 
 interface NetworkGraphProps {
   nodes: NodeRow[];
   edges: EdgeRow[];
   selectedGid: string;
-  mode: 'focus' | 'overview';
+  mode: 'focus' | 'overview' | 'paths' | 'cluster';
+  clusterId?: number;
   onSelect: (gid: string) => void;
 }
 
@@ -94,7 +96,7 @@ function focusPositions(nodes: NodeRow[], edges: EdgeRow[], selectedGid: string)
   return positions;
 }
 
-export default function NetworkGraph({ nodes, edges, selectedGid, mode, onSelect }: NetworkGraphProps) {
+export default function NetworkGraph({ nodes, edges, selectedGid, mode, clusterId, onSelect }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Core | null>(null);
   const onSelectRef = useRef(onSelect);
@@ -142,6 +144,10 @@ export default function NetworkGraph({ nodes, edges, selectedGid, mode, onSelect
           style: { 'border-style': 'dashed', 'border-color': '#aaa0ba', 'border-width': 2 },
         },
         {
+          selector: 'node.external',
+          style: { 'border-style': 'dotted', 'border-color': '#b8acc9', 'border-width': 3, opacity: 0.6 },
+        },
+        {
           selector: 'edge',
           style: {
             width: 'data(width)',
@@ -157,6 +163,10 @@ export default function NetworkGraph({ nodes, edges, selectedGid, mode, onSelect
         {
           selector: 'edge.connected',
           style: { 'line-color': '#bd99ff', 'target-arrow-color': '#bd99ff', opacity: 0.87, 'z-index': 5 },
+        },
+        {
+          selector: 'edge.evidence',
+          style: { 'line-color': '#e7cb81', 'target-arrow-color': '#e7cb81', opacity: 1, 'z-index': 6, width: 3 },
         },
         {
           selector: 'node.chosen',
@@ -190,7 +200,7 @@ export default function NetworkGraph({ nodes, edges, selectedGid, mode, onSelect
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph) return;
-    const positions = mode === 'overview' ? overviewPositions(nodes) : focusPositions(nodes, edges, selectedGid);
+    const positions = mode === 'overview' || mode === 'cluster' ? overviewPositions(nodes) : focusPositions(nodes, edges, selectedGid);
     const ids = new Set(nodes.map((node) => node.gid));
     const elements: ElementDefinition[] = nodes.map((node) => ({
       data: {
@@ -198,22 +208,22 @@ export default function NetworkGraph({ nodes, edges, selectedGid, mode, onSelect
         gid: node.gid,
         color: roles[node.role].color,
         shortId: shortId(node.gid),
-        label: mode === 'focus' && nodes.length < 35 ? shortId(node.gid) : '',
+        label: mode !== 'overview' && nodes.length < 35 ? shortId(node.gid) : '',
         size: Math.min(35, 10 + Math.log2(1 + node.in_deg + node.out_deg) * 3 + node.priority_score * 0.035),
       },
       position: positions.get(node.gid),
-      classes: [node.is_seed ? 'seed' : '', node.truncated_by_depth ? 'boundary' : '', node.gid === selectedGid ? 'chosen' : ''].filter(Boolean).join(' '),
+      classes: [node.is_seed ? 'seed' : '', node.truncated_by_depth ? 'boundary' : '', mode === 'cluster' && node.cluster_id !== clusterId ? 'external' : '', node.gid === selectedGid ? 'chosen' : ''].filter(Boolean).join(' '),
     }));
-    edges.forEach((edge, index) => {
+    edges.forEach(edge => {
       if (!ids.has(edge.src) || !ids.has(edge.dst)) return;
       elements.push({
         data: {
-          id: `edge:${index}`,
+          id: `edge:${edgeId(edge.src, edge.dst)}`,
           source: `node:${edge.src}`,
           target: `node:${edge.dst}`,
           width: Math.min(3, 0.55 + Math.log10(1 + Math.max(0, edge.sum_kzt)) * 0.2),
         },
-        classes: edge.src === selectedGid || edge.dst === selectedGid ? 'connected' : '',
+        classes: mode === 'paths' ? 'evidence' : edge.src === selectedGid || edge.dst === selectedGid ? 'connected' : '',
       });
     });
     graph.batch(() => {
@@ -221,7 +231,7 @@ export default function NetworkGraph({ nodes, edges, selectedGid, mode, onSelect
       graph.add(elements);
     });
     graph.layout({ name: 'preset', fit: true, padding: mode === 'overview' ? 35 : 55, animate: false }).run();
-  }, [nodes, edges, selectedGid, mode]);
+  }, [nodes, edges, selectedGid, mode, clusterId]);
 
   const zoom = (factor: number) => {
     const graph = graphRef.current;

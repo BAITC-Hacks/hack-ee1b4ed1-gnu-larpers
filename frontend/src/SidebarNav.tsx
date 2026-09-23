@@ -1,4 +1,5 @@
-import { CircleHelp, FileText, GitBranch, Layers3, PanelLeftClose, PanelLeftOpen, Search, Table2, Waypoints } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { CircleHelp, FileText, GitBranch, Layers3, Menu, PanelLeftClose, PanelLeftOpen, Search, Table2, Waypoints } from 'lucide-react';
 
 type View = 'report' | 'visualization' | 'explore' | 'clusters' | 'table' | 'method';
 
@@ -21,13 +22,27 @@ const sections = [
 ] as const;
 
 export default function SidebarNav({ view, onNavigate, onBrowseClients, commandOpen, collapsed, onToggle }: SidebarNavProps) {
-  return <aside className={`navigation-rail beautiful-sidebar ${collapsed ? 'collapsed' : ''}`} data-sidebar-collapsed={collapsed} aria-label="Навигация по аналитике">
+  const mobileMenuRef = useRef<HTMLButtonElement>(null);
+  const sidebarToggleRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 800px)').matches) return;
+    if (!collapsed) sidebarToggleRef.current?.focus();
+    else if (document.activeElement?.closest('#analytics-navigation')) mobileMenuRef.current?.focus();
+  }, [collapsed]);
+
+  return <>
+    <header className="mobile-header">
+      <button ref={mobileMenuRef} className="mobile-menu-toggle" type="button" onClick={onToggle} aria-label={collapsed ? 'Открыть меню' : 'Закрыть меню'} aria-expanded={!collapsed} aria-controls="analytics-navigation"><Menu size={20} /></button>
+      <span className="mobile-brand">Анализ транзакций</span>
+      <span className="mobile-section">{sections.find(item => item.view === view)?.label}</span>
+    </header>
+    <aside id="analytics-navigation" className={`navigation-rail beautiful-sidebar ${collapsed ? 'collapsed' : ''}`} data-sidebar-collapsed={collapsed} aria-label="Навигация по аналитике">
     <div className="sidebar-inner">
       <header className="sidebar-header">
         <button className="sidebar-workspace-button" type="button" title="Открыть аналитический отчёт" aria-label="Открыть аналитический отчёт" tabIndex={collapsed ? -1 : 0} onClick={() => onNavigate('report')}>
           <span className="sidebar-monogram">А</span><span className="sidebar-copy sidebar-workspace-name">Анализ транзакций</span>
         </button>
-        <button className="sidebar-toggle" type="button" onClick={onToggle} aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'} title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button>
+        <button ref={sidebarToggleRef} className="sidebar-toggle" type="button" onClick={onToggle} aria-expanded={!collapsed} aria-controls="analytics-navigation" aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'} title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>{collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button>
       </header>
 
       <nav className="sidebar-primary" aria-label="Разделы">
@@ -37,5 +52,5 @@ export default function SidebarNav({ view, onNavigate, onBrowseClients, commandO
       </nav>
 
     </div>
-  </aside>;
+  </aside></>;
 }

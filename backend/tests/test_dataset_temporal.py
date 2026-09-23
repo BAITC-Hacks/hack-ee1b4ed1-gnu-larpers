@@ -28,7 +28,11 @@ def make_dataset(transactions=None, gids=(1, 2, 3, 4)):
 
 def features_for(transactions, gid=2, window_days=3):
     dataset = validate_dataset(make_dataset(transactions))
-    return temporal_features(daily_flows(dataset.transactions), window_days)[gid]
+    return temporal_features(
+        daily_flows(dataset.transactions),
+        window_days,
+        observation_end=dataset.transactions.date.max(),
+    )[gid]
 
 
 @pytest.mark.parametrize(
@@ -207,8 +211,11 @@ def test_matching_window_includes_boundary_and_excludes_older_incoming(out_day, 
 @pytest.mark.parametrize(
     ("last_day", "expected_censored"), [("2026-01-03", True), ("2026-01-04", False)]
 )
-def test_right_censoring_uses_dataset_end_and_complete_window(last_day, expected_censored):
-    features = features_for([(1, 2, "2026-01-01", 10.0), (3, 4, last_day, 1.0)])
+@pytest.mark.parametrize("last_recipient", [3, 4])
+def test_right_censoring_uses_dataset_end_and_complete_window(
+    last_day, expected_censored, last_recipient
+):
+    features = features_for([(1, 2, "2026-01-01", 10.0), (3, last_recipient, last_day, 1.0)])
 
     assert features["temporal_right_censored"] is expected_censored
 

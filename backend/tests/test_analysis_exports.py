@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -60,6 +61,110 @@ def test_direction_distinguishes_fan_in_and_fan_out():
     assert analyze(distributor).nodes.set_index("gid").loc[20, "role"] == "distributor"
 
 
+def test_exports_equal_role_candidates_with_stable_primary_and_priority_components(tmp_path):
+    dataset = fixture_dataset(
+        [(gid, 20, "2026-07-01", 100) for gid in range(1, 9)]
+        + [(20, gid, "2026-07-01", 100) for gid in range(1, 9)],
+        seeds={20},
+        isolates={99},
+    )
+    result = analyze(dataset)
+    paths = write_outputs(result, tmp_path)
+    payload = json.loads(paths["graph.json"].read_text())
+    node = next(row for row in payload["nodes"] if row["gid"] == "20")
+
+    assert node["role"] == "consolidator"
+    assert node["role_score"] == 0.85
+    assert node["role_candidates"] == [
+        {"role": "consolidator", "score": 0.85},
+        {"role": "distributor", "score": 0.85},
+        {"role": "peripheral", "score": 0.3},
+    ]
+    assert node["role_margin"] == 0
+    assert set(node["priority_components"]) == {
+        "betweenness",
+        "turnover",
+        "transactions",
+        "seed_sources",
+        "role_support",
+        "temporal",
+    }
+    assert node["priority_components"]["role_support"] == pytest.approx(0.1275)
+    assert sum(node["priority_components"].values()) == pytest.approx(
+        node["priority_score"], abs=0.000001
+    )
+    csv = pd.read_csv(paths["nodes_roles.csv"], dtype=str, keep_default_na=False)
+    assert "role_candidates" not in csv.columns
+    assert csv.loc[csv.gid == "20", "role"].item() == node["role"]
+    isolated = next(row for row in payload["nodes"] if row["gid"] == "99")
+    assert isolated["role_candidates"] == []
+    assert isolated["role_margin"] is None
+    assert isolated["priority_score"] == sum(isolated["priority_components"].values()) == 0
+
+
+def test_role_candidates_preserve_support_before_boundary_and_seed_adjustments(tmp_path):
+    result = analyze(
+        fixture_dataset(
+            [(1, 2, "2026-07-01", 100), (1, 3, "2026-07-01", 100)],
+            depths={2: 4},
+            seeds={3},
+        )
+    )
+    payload = json.loads(write_outputs(result, tmp_path)["graph.json"].read_text())
+    nodes = {row["gid"]: row for row in payload["nodes"]}
+
+    for gid, adjusted_support in (("2", 0.2), ("3", 0.35)):
+        node = nodes[gid]
+        assert node["role"] == "terminal"
+        assert node["role_score"] == adjusted_support
+        assert node["role_candidates"] == [
+            {"role": "terminal", "score": 0.6625},
+            {"role": "peripheral", "score": 0.3},
+        ]
+        assert node["role_margin"] == 0.3625
+        assert node["priority_components"]["role_support"] == pytest.approx(0.15 * adjusted_support)
+    assert nodes["1"]["role_candidates"] == [{"role": "peripheral", "score": 0.3}]
+    assert nodes["1"]["role_margin"] is None
+
+
+def test_last_self_transfer_extends_observation_without_affecting_matched_flows():
+    results = []
+    for last_day in ("2026-07-02", "2026-07-31"):
+        results.append(
+            analyze(
+                fixture_dataset(
+                    [
+                        (1, 2, "2026-07-01", 100),
+                        (2, 3, "2026-07-02", 100),
+                        (4, 4, last_day, 1),
+                    ]
+                )
+            )
+        )
+    censored, complete = results
+    before, after = (result.nodes.set_index("gid").loc[2] for result in results)
+
+    pd.testing.assert_frame_equal(censored.daily, complete.daily)
+    assert complete.metadata["date_to"] == "2026-07-31"
+    assert before.temporal_right_censored
+    assert not after.temporal_right_censored
+    assert "temporal_right_censored" not in after["flags"]
+    assert before.role == after.role == "transit"
+    assert before.following_days_matched_minor == after.following_days_matched_minor == 10000
+    assert before.role_score == 0.748
+    assert after.role_score == 0.88
+    assert (
+        before.role_candidates
+        == after.role_candidates
+        == [
+            {"role": "transit", "score": 0.88},
+            {"role": "peripheral", "score": 0.3},
+        ]
+    )
+    assert before.role_margin == after.role_margin == 0.58
+    assert after.priority_score - before.priority_score == pytest.approx(0.0198)
+
+
 def test_cycles_are_reported_without_claiming_temporal_provenance():
     result = analyze(
         fixture_dataset(
@@ -117,7 +222,9 @@ def test_all_json_identifiers_preserve_int64_precision_and_unavailable_is_explic
     first_row = next(row for row in graph["nodes"] if row["gid"] == str(first))
     assert first_row["pass_through"] is None
     csv = pd.read_csv(artifacts["nodes_roles.csv"], dtype=str, keep_default_na=False)
-    assert csv.loc[csv.gid == str(first), "pass_through"].item() == "unavailable"
+    assert not first_row["pass_through_available"]
+    assert "pass_through" not in csv.columns
+    assert set(csv.gid) == {str(first), str(second), str(third)}
     assert not csv.eq("").any().any()
 
 
@@ -135,27 +242,62 @@ def test_outputs_cover_all_nodes_and_form_a_consistent_partition(tmp_path):
     assert result.top_nodes.priority_score.is_monotonic_decreasing
     assert result.top_nodes["rank"].tolist() == list(range(1, 21))
     for name, columns in {
-        "nodes_roles.csv": {
+        "nodes_roles.csv": [
             "gid",
             "role",
             "role_score",
             "cluster_id",
             "priority_score",
             "evidence",
-        },
-        "clusters.csv": {
+        ],
+        "clusters.csv": [
             "cluster_id",
             "n_nodes",
             "n_seed",
             "sum_kzt_internal",
             "top_gids",
             "hypothesis",
-        },
-        "top_nodes.csv": {"rank", "gid", "role", "priority_score", "why"},
+        ],
+        "top_nodes.csv": ["rank", "gid", "role", "priority_score", "why"],
     }.items():
         frame = pd.read_csv(artifacts[name], keep_default_na=False)
-        assert columns <= set(frame.columns)
+        assert list(frame.columns) == columns
         assert not frame.eq("").any().any()
+    payload = json.loads(artifacts["graph.json"].read_text())
+    assert all("priority_components" in node for node in payload["nodes"])
+    assert all("incoming_minor_external" in cluster for cluster in payload["clusters"])
+
+
+def test_priority_explanations_reconcile_with_scores_and_preserve_observation_limits(tmp_path):
+    dataset = fixture_dataset(
+        [
+            (1, 2, "2026-07-01", 100),
+            (2, 3, "2026-07-02", 90),
+            (3, 4, "2026-07-03", 80),
+        ],
+        seeds={1},
+        depths={4: 4},
+        isolates={99},
+    )
+    result = analyze(dataset)
+    artifacts = write_outputs(result, tmp_path)
+    exported = pd.read_csv(artifacts["top_nodes.csv"], dtype={"gid": str})
+    nodes = result.nodes.set_index("gid")
+    explanations = dict(zip(exported.gid, exported.why, strict=True))
+    for row in exported.itertuples(index=False):
+        node = nodes.loc[int(row.gid)]
+        contributions = re.findall(r": (\d+\.\d{6})(?=;|\. Наблюдения:)", row.why)
+        assert len(contributions) == 6
+        assert sum(map(float, contributions)) == pytest.approx(row.priority_score, abs=0.000004)
+        assert node.evidence in row.why
+        assert row.why != node.evidence
+        assert f"Приоритет {row.priority_score:.6f}" in row.why
+        assert "Посредничество:" in row.why
+    assert "вход seed неполон" in explanations["1"]
+    assert "граница 4-го колена" in explanations["4"]
+    assert "последующие дни наблюдаются не полностью" in explanations["2"]
+    assert "Приоритет 0.000000" in explanations["99"]
+    assert "0 входящих и 0 исходящих" in explanations["99"]
 
 
 def test_edgeless_graph_and_self_loop_are_supported(tmp_path):
