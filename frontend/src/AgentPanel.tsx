@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Callout, Card, IconButton, TextArea, Theme, Tooltip } from '@radix-ui/themes';
-import { ArrowUp, ArrowUpRight, Bot, Check, ChevronDown, CircleHelp, GitBranch, Info, LoaderCircle, MessageSquarePlus, Network, RefreshCw, ScanSearch, Square, X } from 'lucide-react';
-import { agentError, evidenceTransactionAction, parseAgentStatus, readAgentStream, type AgentResponse, type AgentStatus, type AgentStreamUpdate, type EvidenceAction, type EvidenceCard } from './agent';
+import { ArrowUp, ArrowUpRight, Bot, Check, ChevronDown, CircleHelp, GitBranch, History, Info, LoaderCircle, MessageSquarePlus, Network, RefreshCw, ScanSearch, Square, X } from 'lucide-react';
+import { agentError, evidenceTransactionAction, parseAgentStatus, readAgentStream, type AgentStatus, type AgentStreamUpdate, type EvidenceAction, type EvidenceCard } from './agent';
+import { chatContinuationNotice, readAgentChats, saveActiveChat, saveAgentChat, type AgentActivity, type AgentChat, type AgentTurn } from './agent-history';
 import { roles, type GraphData, type Role } from './types';
 
 interface AgentPanelProps {
@@ -16,23 +17,9 @@ interface AgentPanelProps {
   onSaveEvidence?: (evidence: EvidenceCard) => void;
 }
 
-interface Turn {
-  id: number;
-  question: string;
-  selectedGid: string;
-  response: AgentResponse;
-  activity: AgentActivity;
-}
-
-interface AgentActivity {
-  startedAt: number;
-  elapsedMs: number;
-  phase: 'connecting' | 'thinking' | 'tool' | 'answer' | 'validating';
-  reasoning: string;
-  tools: { id: string; name: string; state: 'started' | 'completed' }[];
-}
-
 type AnswerPreview = Extract<AgentStreamUpdate, { type: 'answer_preview' }>;
+
+const chatDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const toolLabels: Record<string, string> = {
   get_node: 'Показатели клиента',
@@ -82,8 +69,21 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
   const [statusError, setStatusError] = useState('');
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [message, setMessage] = useState('');
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [savedHistory] = useState(() => {
+    try {
+      const saved = readAgentChats(window.localStorage, data);
+      return { ...saved, error: saved.unreadable ? 'Некоторые сохранённые чаты повреждены и не могут быть открыты.' : '' };
+    } catch {
+      return { chats: [] as AgentChat[], activeId: null, error: 'История недоступна: браузер запретил доступ к хранилищу.' };
+    }
+  });
+  const [chats, setChats] = useState(savedHistory.chats);
+  const [activeChatId, setActiveChatId] = useState<string | null>(savedHistory.activeId);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyError, setHistoryError] = useState(savedHistory.error);
+  const activeChat = chats.find(chat => chat.id === activeChatId);
+  const turns = activeChat?.turns ?? [];
+  const continuationNotice = chatContinuationNotice(activeChat);
   const [pending, setPending] = useState(false);
   const [activity, setActivity] = useState<AgentActivity | null>(null);
   const [preview, setPreview] = useState<AnswerPreview | null>(null);
@@ -96,6 +96,20 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
   const contextKey = JSON.stringify([data.metadata.analysis_id, selectedGid, clusterId, role, direction, from, to]);
   const currentContext = useRef(contextKey);
   currentContext.current = contextKey;
+
+  const storeChat = (chat: AgentChat) => {
+    try { chat = saveAgentChat(window.localStorage, chat, data); }
+    catch { setHistoryError('Не удалось сохранить чат в браузере. Переписка доступна до обновления страницы.'); }
+    setChats(previous => [chat, ...previous.filter(item => item.id !== chat.id)].sort((left, right) => right.updatedAt - left.updatedAt));
+  };
+  const activateChat = (id: string | null) => {
+    setActiveChatId(id);
+    try { saveActiveChat(window.localStorage, data.metadata.analysis_id!, id); }
+    catch { setHistoryError('Не удалось сохранить историю в браузере. Переписка доступна до обновления страницы.'); }
+  };
+  const closeSession = () => {
+    if (activeChat && !activeChat.closed) storeChat({ ...activeChat, closed: true });
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,7 +130,7 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
       setPending(false);
       setActivity(null);
       setPreview(null);
-      setConversationId(null);
+      closeSession();
       setNotice('Контекст изменился. Запрос остановлен; следующий вопрос начнёт новый диалог.');
     }
   }, [contextKey]);
@@ -134,7 +148,7 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
     if (!viewport || !followBottom.current) return;
     const latestTurn = viewport.querySelector<HTMLElement>('.trace-agent-turn:last-child');
     viewport.scrollTop = pending ? viewport.scrollHeight : latestTurn ? viewport.scrollTop + latestTurn.getBoundingClientRect().top - viewport.getBoundingClientRect().top - 24 : 0;
-  }, [pending, turns.length, open, activity, preview]);
+  }, [pending, turns.length, activeChatId, historyOpen, open, activity, preview]);
 
   const close = () => {
     setOpen(false);
@@ -162,15 +176,16 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
   const available = Boolean(status?.available && matchingAnalysis);
   const invalidPeriod = Boolean(from && to && from > to);
   const reset = () => {
+    if (request.current) closeSession();
     sequence.current += 1;
     request.current?.abort();
     request.current = null;
     setPending(false);
     setActivity(null);
     setPreview(null);
-    setTurns([]);
+    activateChat(null);
+    setHistoryOpen(false);
     setMessage('');
-    setConversationId(null);
     setError('');
     setNotice('');
     followBottom.current = true;
@@ -182,8 +197,17 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
     setPending(false);
     setActivity(null);
     setPreview(null);
-    setConversationId(null);
+    closeSession();
     setNotice('Запрос остановлен. Следующий вопрос начнёт новый диалог.');
+  };
+  const selectChat = (id: string) => {
+    if (request.current) cancel();
+    activateChat(id);
+    setHistoryOpen(false);
+    setMessage('');
+    setError('');
+    setNotice('');
+    followBottom.current = true;
   };
   const send = async (question: string) => {
     const trimmed = question.trim();
@@ -191,7 +215,9 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
     const controller = new AbortController();
     const requestId = ++sequence.current;
     const sentContext = contextKey;
-    const sentConversation = conversationId;
+    const sentChat = chatContinuationNotice(activeChat) ? undefined : activeChat;
+    const sentConversation = sentChat?.id ?? null;
+    if (sentChat) storeChat({ ...sentChat, closed: true });
     let requestActivity: AgentActivity = { startedAt: Date.now(), elapsedMs: 0, phase: 'connecting', reasoning: '', tools: [] };
     request.current = controller;
     followBottom.current = true;
@@ -229,12 +255,14 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
         }
       }, controller.signal);
       if (controller.signal.aborted || sequence.current !== requestId || currentContext.current !== sentContext) return;
-      setConversationId(result.conversation_id);
-      setTurns(previous => [...previous, { id: requestId, question: trimmed, selectedGid, response: result, activity: { ...requestActivity, elapsedMs: Date.now() - requestActivity.startedAt } }]);
+      const completedAt = Date.now();
+      const turn: AgentTurn = { id: crypto.randomUUID(), question: trimmed, selectedGid, response: result, activity: { ...requestActivity, elapsedMs: completedAt - requestActivity.startedAt } };
+      storeChat({ version: 1, id: result.conversation_id, analysisId: result.analysis_id, createdAt: sentChat?.createdAt ?? requestActivity.startedAt, updatedAt: completedAt, closed: false, turns: [...(sentChat?.turns ?? []), turn] });
+      activateChat(result.conversation_id);
       setMessage('');
     } catch (reason) {
       if (!controller.signal.aborted && sequence.current === requestId && currentContext.current === sentContext) {
-        setConversationId(null);
+        closeSession();
         setError(reason instanceof Error ? reason.message : 'Не удалось связаться с агентом.');
         setNotice('Следующий вопрос начнёт новый диалог. Предыдущие ответы сохранены в истории.');
       }
@@ -263,7 +291,7 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
           <div><span className="trace-agent-wordmark">TRACE <span>/ AI</span></span><h2 id="agent-heading">Ассистент расследования</h2></div>
         </div>
         <div className="trace-agent-header-actions">
-          <Tooltip content="Новый диалог"><IconButton type="button" variant="ghost" color="gray" size="2" aria-label="Новый диалог" onClick={reset} disabled={!turns.length && !pending && !error && !message}><MessageSquarePlus size={18} /></IconButton></Tooltip>
+          <Tooltip content="Новый диалог"><IconButton type="button" variant="ghost" color="gray" size="2" aria-label="Новый диалог" onClick={reset} disabled={!historyOpen && !turns.length && !pending && !error && !message}><MessageSquarePlus size={18} /></IconButton></Tooltip>
           <Tooltip content="Свернуть · Esc"><IconButton ref={closeButton} type="button" variant="ghost" color="gray" size="2" aria-label="Свернуть панель ассистента" onClick={close}><X size={19} /></IconButton></Tooltip>
         </div>
         <div className="trace-agent-status-line" role="status">
@@ -271,10 +299,21 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
             {!status && !statusError ? <LoaderCircle size={11} className="trace-agent-spinner" /> : <span className="trace-agent-status-dot" data-ready={available} />}
             {!status && !statusError ? 'Проверяем доступность' : available ? 'Агент готов' : 'Агент недоступен'}
           </Badge>
-          {status?.model && <span className="trace-agent-model" title={`Текущая модель: ${status.model}`}>{status.model}</span>}
+          <Button type="button" size="1" variant="ghost" color="gray" aria-label="История чатов" aria-expanded={historyOpen} aria-controls="agent-chat-history" onClick={() => setHistoryOpen(value => !value)}><History size={14} />Чаты{chats.length > 0 && <Badge size="1" color="gray">{chats.length}</Badge>}</Button>
         </div>
       </header>
 
+      {historyError && <Callout.Root size="1" color="amber" role="alert" className="trace-agent-history-error"><Callout.Icon><Info size={15} /></Callout.Icon><Callout.Text>{historyError}</Callout.Text></Callout.Root>}
+      {historyOpen ? <section id="agent-chat-history" className="trace-agent-history" aria-label="Сохранённые чаты">
+        <div className="trace-agent-history-heading"><div><h3>История чатов</h3><p>Диалоги по текущему анализу</p></div><Button type="button" size="1" variant="soft" onClick={reset}><MessageSquarePlus size={14} />Новый чат</Button></div>
+        {chats.length ? <div className="trace-agent-chat-list">{chats.map(chat => <button type="button" key={chat.id} className="trace-agent-chat-item" aria-label={`Открыть чат ${chat.turns[0].question}`} aria-current={activeChatId === chat.id ? 'true' : undefined} onClick={() => selectChat(chat.id)}>
+          <span className="trace-agent-chat-title">{chat.turns[0].question}</span>
+          <span className="trace-agent-chat-preview">{chat.turns.at(-1)!.response.answer.summary}</span>
+          <span className="trace-agent-chat-meta"><time dateTime={new Date(chat.updatedAt).toISOString()}>{chatDate.format(chat.updatedAt)}</time><span>Ответов: {chat.turns.length}{activeChatId === chat.id ? ' · Текущий' : ''}</span></span>
+        </button>)}</div> : <div className="trace-agent-history-empty"><History size={28} /><h4>Здесь будут ваши диалоги</h4><p>Задайте агенту вопрос. Чат появится в истории после первого ответа.</p></div>}
+        <p className="trace-agent-session-note">Чаты сохраняются в этом браузере и доступны после обновления страницы.</p>
+      </section> : <>
+      {activeChat && <div className="trace-agent-current-chat" title={activeChat.turns[0].question}>{activeChat.turns[0].question}</div>}
       <details className="trace-agent-context">
         <summary><span className="trace-agent-context-label"><Network size={15} />Контекст</span><span className="trace-agent-context-client" title={selectedGid}>Клиент …{selectedGid.slice(-8)}</span><ChevronDown size={14} /></summary>
         <div className="trace-agent-context-body">
@@ -329,13 +368,15 @@ export default function AgentPanel({ data, selectedGid, clusterId, role, directi
         {invalidPeriod && <Callout.Root size="1" color="amber" role="alert" className="trace-agent-feedback"><Callout.Icon><Info size={15} /></Callout.Icon><Callout.Text>Начальная дата должна быть не позже конечной.</Callout.Text></Callout.Root>}
         {error && <Callout.Root size="1" color="red" role="alert" className="trace-agent-feedback"><Callout.Icon><Info size={15} /></Callout.Icon><div><Callout.Text>{error}</Callout.Text><Button type="button" size="1" variant="soft" color="red" disabled={!available || pending || invalidPeriod || !message.trim()} onClick={() => void send(message)}><RefreshCw size={12} />Повторить запрос</Button></div></Callout.Root>}
         {notice && <p className="trace-agent-notice" role="status">{notice}</p>}
+        {!pending && !notice && continuationNotice && <p className="trace-agent-notice" role="status">{continuationNotice}</p>}
         <form onSubmit={event => { event.preventDefault(); void send(message); }}>
           <label className="trace-agent-visually-hidden" htmlFor="agent-message">Ваш вопрос</label>
           <TextArea id="agent-message" className="trace-agent-input" size="2" variant="surface" value={pending ? '' : message} maxLength={4000} rows={2} placeholder={pending ? 'Агент работает над вашим вопросом…' : 'Спросите о клиенте, переводах или связях…'} onChange={event => setMessage(event.target.value)} disabled={!available || pending} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(message); } }} />
           <div className="trace-agent-send-row"><span className="trace-agent-keyboard-hint">Enter — отправить <span>·</span> Shift + Enter — перенос</span><span className="trace-agent-counter">{pending ? 0 : message.length}/4000</span>{pending ? <Button key="cancel" type="button" size="2" variant="soft" color="gray" onClick={event => { event.preventDefault(); cancel(); }}><Square size={12} />Остановить</Button> : <Button key="send" size="2" type="submit" disabled={!available || !message.trim() || invalidPeriod}><ArrowUp size={16} />Исследовать</Button>}</div>
         </form>
-        <p className="trace-agent-session-note">История сохраняется до обновления страницы.</p>
+        <p className="trace-agent-session-note">Готовые ответы автоматически сохраняются в истории этого браузера.</p>
       </div>
+      </>}
     </section>}
   </Theme>;
 }
