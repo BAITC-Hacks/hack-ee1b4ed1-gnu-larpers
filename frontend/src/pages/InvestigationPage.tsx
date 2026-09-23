@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DailyTransfersChart } from '../Charts';
 import { ArrowDownLeft, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleHelp, Copy, ShieldCheck } from 'lucide-react';
 import { dailyForNode, transactionsForNode } from '../data';
 import { roles, type DailyRow, type GraphData, type NodeRow } from '../types';
@@ -19,18 +20,11 @@ function readableEvidence(node: NodeRow) {
 }
 
 function DailyChart({ rows }: { rows: DailyRow[] }) {
-  const maximum = Math.max(1, ...rows.flatMap(row => [row.in_minor, row.out_minor]));
   if (!rows.length) return <div className="chart-empty">Внешних переводов в выборке нет</div>;
-  return <div className="daily-chart" aria-label="Входящие и исходящие суммы по активным дням">
-    <div className="chart-scale"><span>{shortMoney(maximum / 100)}</span><span>0 ₸</span></div>
-    <div className="chart-body">
-      <div className="chart-bars">{rows.map(row => <div className="day-bars" key={row.date} title={`${row.date}: входящие ${money(row.in_minor / 100)}, исходящие ${money(row.out_minor / 100)}`}>
-        <span className="bar-in" style={{ height: `${row.in_minor / maximum * 100}%` }} />
-        <span className="bar-out" style={{ height: `${row.out_minor / maximum * 100}%` }} />
-      </div>)}</div>
-      <div className="chart-dates"><span>{dateLabel(rows[0].date)}</span><span>{dateLabel(rows[rows.length - 1].date)}</span></div>
-    </div>
-  </div>;
+  return <DailyTransfersChart rows={rows} compact series={[
+    { key: 'in_minor', label: 'Входящие', color: '#a785f4' },
+    { key: 'out_minor', label: 'Исходящие', color: '#71c1cb' },
+  ]} />;
 }
 
 function ClientDetails({ node, data }: { node: NodeRow; data: GraphData }) {

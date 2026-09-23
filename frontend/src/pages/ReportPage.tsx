@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { DailyTransfersChart, RolesChart } from '../Charts';
 import { Activity, ArrowRight, BarChart3, ChevronRight, CircleHelp, GitBranch, Layers3, ShieldCheck, Users } from 'lucide-react';
 import { roles, type GraphData, type Role } from '../types';
 import { dateLabel, money, number, percent, plural, shortId, shortMoney } from '../format';
@@ -20,8 +21,6 @@ export default function ReportPage({ data, onSelect, onCluster, onMethod }: {
     return { counts, days, peak, groups };
   }, [data]);
   const largestRole = (Object.keys(roles) as Role[]).sort((a, b) => report.counts[b] - report.counts[a])[0];
-  const maxDay = Math.max(1, ...report.days.map(([, value]) => value));
-  const maxRole = Math.max(1, ...Object.values(report.counts));
   const largestGroup = report.groups[0];
   return <div className="report-page">
     <section className="report-hero">
@@ -38,8 +37,8 @@ export default function ReportPage({ data, onSelect, onCluster, onMethod }: {
 
     <div className="report-section-heading"><div><h2>Что показывает выборка</h2><p>Показатели рассчитаны по загруженным операциям и клиентам.</p></div></div>
     <div className="report-chart-grid">
-      <section className="report-card volume-card"><div className="card-heading"><div><span className="section-icon"><Activity size={19} /></span><h3>Переводы по дням</h3><p>Сумма всех операций за каждый активный день</p></div><span className="card-pill">{report.days.length} дней</span></div><div className="volume-chart" role="img" aria-label="Дневной объём переводов за период"><div className="volume-scale"><span>{shortMoney(maxDay / 100)}</span><span>0 ₸</span></div><div className="volume-bars">{report.days.map(([day, value]) => <div className={`volume-bar ${report.peak?.[0] === day ? 'peak' : ''}`} key={day} title={`${dateLabel(day)}: ${money(value / 100)}`}><span style={{ height: `${Math.max(2, value / maxDay * 100)}%` }} /></div>)}</div></div><div className="chart-axis"><span>{dateLabel(report.days[0]?.[0] ?? null)}</span><span>{dateLabel(report.days[report.days.length - 1]?.[0] ?? null)}</span></div><div className="chart-insight"><span className="insight-mark" /><span>Самый активный день — <strong>{dateLabel(report.peak?.[0] ?? null)}</strong>, {shortMoney((report.peak?.[1] ?? 0) / 100)}.</span></div></section>
-      <section className="report-card roles-card"><div className="card-heading"><div><span className="section-icon"><BarChart3 size={19} /></span><h3>Роли клиентов</h3><p>Одна основная роль у каждого клиента</p></div></div><div className="role-breakdown">{(Object.keys(roles) as Role[]).sort((a, b) => report.counts[b] - report.counts[a]).map(role => <div className="role-breakdown-row" key={role}><div className="role-breakdown-label"><span><i style={{ background: roles[role].color }} />{roles[role].label}</span><strong>{number.format(report.counts[role])}<small> · {percent(report.counts[role] / data.metadata.n_nodes)}</small></strong></div><div className="role-track"><span style={{ width: `${report.counts[role] / maxRole * 100}%`, background: roles[role].color }} /></div></div>)}</div><p className="card-note">Чаще всего встречается роль «{roles[largestRole].label.toLocaleLowerCase('ru')}». Роль описывает поведение только в доступной выборке.</p></section>
+      <section className="report-card volume-card"><div className="card-heading"><div><span className="section-icon"><Activity size={19} /></span><h3>Переводы по дням</h3><p>Сумма всех операций за каждый активный день</p></div><span className="card-pill">{report.days.length} дней</span></div><DailyTransfersChart rows={report.days.map(([date, total_minor]) => ({ date, total_minor }))} series={[{ key: 'total_minor', label: 'Сумма переводов', color: '#62616b' }]} highlightedDate={report.peak?.[0]} /><div className="chart-insight"><span className="insight-mark" /><span>Самый активный день — <strong>{dateLabel(report.peak?.[0] ?? null)}</strong>, {shortMoney((report.peak?.[1] ?? 0) / 100)}.</span></div></section>
+      <section className="report-card roles-card"><div className="card-heading"><div><span className="section-icon"><BarChart3 size={19} /></span><h3>Роли клиентов</h3><p>Одна основная роль у каждого клиента</p></div></div><RolesChart counts={report.counts} total={data.metadata.n_nodes} /><p className="card-note">Чаще всего встречается роль «{roles[largestRole].label.toLocaleLowerCase('ru')}». Роль описывает поведение только в доступной выборке.</p></section>
     </div>
 
     <div className="report-lists-grid">
