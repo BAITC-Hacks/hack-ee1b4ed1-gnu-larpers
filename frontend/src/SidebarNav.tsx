@@ -15,10 +15,10 @@ interface SidebarNavProps {
 const sections = [
   { view: 'report', label: 'Отчёт', icon: FileText },
   { view: 'visualization', label: 'Визуализация', icon: Waypoints },
-  { view: 'explore', label: 'Исследование', icon: GitBranch },
-  { view: 'clusters', label: 'Группы клиентов', icon: Layers3 },
   { view: 'table', label: 'Таблица клиентов', icon: Table2 },
-  { view: 'method', label: 'Методика', icon: CircleHelp },
+  { view: 'clusters', label: 'Группы клиентов', icon: Layers3 },
+  { view: 'explore', label: 'Исследование', icon: GitBranch },
+  { view: 'method', label: 'Справочник', icon: CircleHelp },
 ] as const;
 
 export default function SidebarNav({ view, onNavigate, onBrowseClients, commandOpen, collapsed, onToggle }: SidebarNavProps) {

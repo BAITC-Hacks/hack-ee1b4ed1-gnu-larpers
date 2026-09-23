@@ -9,6 +9,9 @@ export interface NodeRow {
   role_candidates?: { role: Role; score: number }[];
   role_margin?: number | null;
   priority_components?: Record<string, number>;
+  betweenness_percentile?: number;
+  turnover_percentile?: number;
+  tx_percentile?: number;
   cluster_id: number;
   priority_score: number;
   evidence: string;

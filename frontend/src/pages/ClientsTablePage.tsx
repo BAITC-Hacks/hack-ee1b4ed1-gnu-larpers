@@ -24,7 +24,7 @@ const LABELS: Record<string, string> = {
 };
 
 const DEFAULT_COLUMNS = ['gid', 'role', 'cluster_id', 'priority_score', 'in_kzt', 'out_kzt', 'in_tx', 'out_tx', 'in_deg', 'out_deg', 'flags', 'evidence'];
-const PAGE_SIZE = 50;
+const PAGE_SIZES = [50, 100, 250, 500] as const;
 
 function buildColumns(rows: NodeRow[]): Column[] {
   const available = new Set(rows.flatMap(row => Object.keys(row)));
@@ -88,6 +88,7 @@ export function RecordsTable({ rows, onOpenClient }: { rows: NodeRow[]; onOpenCl
   const [role, setRole] = useState<Role | 'all'>('all');
   const [cluster, setCluster] = useState<string>('all');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
 
@@ -101,9 +102,9 @@ export function RecordsTable({ rows, onOpenClient }: { rows: NodeRow[]; onOpenCl
       (!needle || row.gid.includes(needle) || row.evidence.toLocaleLowerCase('ru').includes(needle) || row.flags.some(flag => flag.toLocaleLowerCase('ru').includes(needle)))
     ).sort((a, b) => compareValues(rawValue(a, sort.key), rawValue(b, sort.key)) * sort.direction || a.gid.localeCompare(b.gid));
   }, [rows, role, cluster, query, sort]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const allSelected = pageRows.length > 0 && pageRows.every(row => selected.has(row.gid));
   const mixedSelected = !allSelected && pageRows.some(row => selected.has(row.gid));
 
@@ -163,7 +164,7 @@ export function RecordsTable({ rows, onOpenClient }: { rows: NodeRow[]; onOpenCl
       </table>
       {!pageRows.length && <div className="records-empty">Клиенты не найдены. Измените запрос или сбросьте фильтры.</div>}
     </div>
-    <div className="records-footer"><span>Показаны {filtered.length ? number.format((currentPage - 1) * PAGE_SIZE + 1) : 0}–{number.format(Math.min(currentPage * PAGE_SIZE, filtered.length))} из {number.format(filtered.length)}</span><div><button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={currentPage === 1} aria-label="Предыдущая страница"><ChevronLeft size={16} /></button><span>Страница {currentPage} из {pageCount}</span><button type="button" onClick={() => setPage(current => Math.min(pageCount, current + 1))} disabled={currentPage === pageCount} aria-label="Следующая страница"><ChevronRight size={16} /></button></div></div>
+    <div className="records-footer"><div className="records-footer-summary"><span>Показаны {filtered.length ? number.format((currentPage - 1) * pageSize + 1) : 0}–{number.format(Math.min(currentPage * pageSize, filtered.length))} из {number.format(filtered.length)}</span><label>На странице <select aria-label="Клиентов на странице" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}>{PAGE_SIZES.map(size => <option key={size} value={size}>{size}</option>)}</select></label></div><div className="records-footer-pages"><button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={currentPage === 1} aria-label="Предыдущая страница"><ChevronLeft size={16} /></button><span>Страница {currentPage} из {pageCount}</span><button type="button" onClick={() => setPage(current => Math.min(pageCount, current + 1))} disabled={currentPage === pageCount} aria-label="Следующая страница"><ChevronRight size={16} /></button></div></div>
   </section>;
 }
 

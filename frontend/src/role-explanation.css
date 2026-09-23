@@ -5,9 +5,39 @@
 }
 
 .priority-breakdown summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
   color: #d1c1e4;
   font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.priority-breakdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.priority-breakdown summary:hover {
+  color: #f0e4ff;
+}
+
+.priority-breakdown summary:focus-visible {
+  outline: 2px solid #a785f4;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.priority-breakdown summary svg {
+  flex: none;
+  color: #a785f4;
+  transition: transform 150ms ease;
+}
+
+.priority-breakdown[open] summary svg {
+  transform: rotate(180deg);
 }
 
 .priority-breakdown dl {
@@ -24,13 +54,25 @@
 }
 
 .priority-breakdown dt {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
   color: #aaa1b4;
+}
+
+.priority-breakdown dt small {
+  color: #8f879b;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 .priority-breakdown dd {
   margin: 0;
   color: #ddd1eb;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .priority-breakdown dl > .priority-total {

@@ -3,6 +3,7 @@
 .beautiful-sidebar nav .sidebar-copy { display: inline; }
 .beautiful-sidebar.collapsed .sidebar-row { width: 36px; }
 .app-shell { min-height: 100dvh; }
+.page-content main { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
 .roles-chart { container-type: inline-size; height: auto; }
 .roles-chart-wide { height: 252px; }
 .roles-chart-compact { display: none; list-style: none; padding: 0; margin: 0; }
@@ -47,7 +48,7 @@
   .sidebar-search-field input { font-size: 16px; }
   .sidebar-search-field button { width: 32px; height: 32px; }
   .page-content, .page-content.sidebar-collapsed { margin-left: 0; transition: none; }
-  .page-content main { padding: 24px 20px calc(88px + env(safe-area-inset-bottom)); }
+  .page-content main { padding: 24px 20px calc(128px + env(safe-area-inset-bottom)); }
   .page-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
   .page-heading h1 { font-size: clamp(26px, 4.5vw, 34px); overflow-wrap: anywhere; }
   .export-menu { left: 0; right: auto; width: min(280px, calc(100vw - 40px)); }
