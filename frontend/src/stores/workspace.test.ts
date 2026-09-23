@@ -224,6 +224,13 @@ describe('workspace state', () => {
 });
 
 describe('workspace URL and saved state', () => {
+  it('restores the client table from its URL', () => {
+    const data = fixture();
+    const state = normalizeWorkspace(data, { view: 'table' });
+    expect(state.view).toBe('table');
+    expect(workspaceFromSearch(data, `?${new URLSearchParams(workspaceSearch(data, state))}`).view).toBe('table');
+  });
+
   it('round-trips adjacent large string identifiers and all URL filters without rounding', () => {
     const gids: [string, string, string] = [
       '100000000000000001', '100000000000000002', '100000000000000003',

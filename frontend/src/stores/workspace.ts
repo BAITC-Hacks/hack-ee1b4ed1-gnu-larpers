@@ -1,7 +1,7 @@
 import { createStore } from 'zustand/vanilla';
 import { roles, type GraphData, type Role } from '../types';
 
-export type WorkspaceView = 'report' | 'visualization' | 'explore' | 'clusters' | 'method';
+export type WorkspaceView = 'report' | 'visualization' | 'explore' | 'clusters' | 'table' | 'method';
 export type VisualizationMode = 'overview' | 'cluster' | 'client';
 export type Direction = 'all' | 'in' | 'out';
 
@@ -47,7 +47,7 @@ export function normalizeWorkspace(data: GraphData, value: unknown): WorkspaceSn
     role: typeof raw.role === 'string' && Object.hasOwn(roles, raw.role) ? raw.role as Role : 'all',
     clusterId,
     hops: raw.hops === 2 ? 2 : 1,
-    view: typeof raw.view === 'string' && ['report', 'visualization', 'explore', 'clusters', 'method'].includes(raw.view) ? raw.view as WorkspaceView : 'report',
+    view: typeof raw.view === 'string' && ['report', 'visualization', 'explore', 'clusters', 'table', 'method'].includes(raw.view) ? raw.view as WorkspaceView : 'report',
     visualizationMode: mode === 'cluster' && clusterId === null ? 'overview' : mode,
     includeExternal: raw.includeExternal === true,
     from: validDate(raw.from, data.metadata.date_from ?? ''),

@@ -149,7 +149,7 @@ function Transactions({ data, node, onSelect, from, to, direction, setFrom, setT
 
 export default function InvestigationPage({ data, node, onSelectClient, onBrowseClients, onOpenMethod, ...filters }: { data: GraphData; node: NodeRow; onSelectClient: (gid: string) => void; onBrowseClients: () => void; onOpenMethod: () => void } & TransactionFilters) {
   return <>
-    <div className="workspace-heading"><div><span>Выбранный клиент</span><h2 title={node.gid}>{node.gid}</h2></div><div className="workspace-actions"><button className="directory-trigger" onClick={onBrowseClients}>Выбрать клиента</button><button className="method-link" onClick={onOpenMethod}>Как читать данные</button></div></div>
+    <div className="workspace-toolbar"><button className="directory-trigger" onClick={onBrowseClients}>Выбрать клиента</button><button className="method-link" onClick={onOpenMethod}>Как читать данные</button></div>
     <div className="profile-workspace"><ClientDetails node={node} data={data} /></div>
     <div className="coverage-banner"><CircleHelp size={16} /><p><strong>{data.metadata.n_boundary} узла на границе выборки.</strong> Отсутствие исходящих переводов не подтверждает, что деньги остались у клиента.</p><button onClick={onOpenMethod}>Подробнее <ArrowRight size={14} /></button></div>
     <Transactions data={data} node={node} onSelect={onSelectClient} {...filters} />
